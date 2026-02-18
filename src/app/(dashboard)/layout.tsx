@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { getRequiredPerfil } from '@/lib/auth'
 import { AppSidebar } from '@/components/app-sidebar'
 import { UserNav } from '@/components/user-nav'
