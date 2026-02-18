@@ -21,20 +21,6 @@ CREATE TYPE gasto_rubro AS ENUM (
 );
 
 -- ============================================================
--- HELPER FUNCTION (SECURITY DEFINER)
--- ============================================================
-
-CREATE OR REPLACE FUNCTION get_user_rol()
-RETURNS user_rol
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT rol FROM public.perfiles WHERE id = auth.uid();
-$$;
-
--- ============================================================
 -- TABLES
 -- ============================================================
 
@@ -48,6 +34,20 @@ CREATE TABLE perfiles (
   created_at  timestamptz NOT NULL DEFAULT now(),
   updated_at  timestamptz NOT NULL DEFAULT now()
 );
+
+-- ============================================================
+-- HELPER FUNCTION (SECURITY DEFINER) — must be after perfiles table
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION get_user_rol()
+RETURNS user_rol
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT rol FROM public.perfiles WHERE id = auth.uid();
+$$;
 
 -- personas: deduplicated contact registry
 CREATE TABLE personas (
