@@ -61,22 +61,23 @@ export async function getPersonasAll(): Promise<Persona[]> {
   return (data ?? []) as Persona[]
 }
 
-async function checkDirigentePosicion(
+async function checkPosicionUnica(
   supabase: Awaited<ReturnType<typeof createClient>>,
+  tipo: RolListaTipo,
   posicion: string,
   excludeId?: number
 ): Promise<void> {
   let query = supabase
     .from('roles_lista')
     .select('id')
-    .eq('tipo', 'Dirigente')
+    .eq('tipo', tipo)
     .eq('posicion', posicion)
 
   if (excludeId !== undefined) query = query.neq('id', excludeId)
 
   const { data } = await query
   if (data && data.length > 0) {
-    throw new Error(`La posición "${posicion}" ya está ocupada por otro Dirigente.`)
+    throw new Error(`La posición "${posicion}" ya está ocupada en este tipo de rol.`)
   }
 }
 
@@ -92,8 +93,8 @@ export async function createRolLista(
   await requireAdmin()
   const supabase = await createClient()
 
-  if (rol.tipo === 'Dirigente' && rol.posicion) {
-    await checkDirigentePosicion(supabase, rol.posicion)
+  if (rol.posicion) {
+    await checkPosicionUnica(supabase, rol.tipo, rol.posicion)
   }
 
   const { error } = await supabase.from('roles_lista').insert({
@@ -120,8 +121,8 @@ export async function updateRolLista(
   await requireAdmin()
   const supabase = await createClient()
 
-  if (data.tipo === 'Dirigente' && data.posicion) {
-    await checkDirigentePosicion(supabase, data.posicion, rolId)
+  if (data.posicion) {
+    await checkPosicionUnica(supabase, data.tipo, data.posicion, rolId)
   }
 
   const { error } = await supabase
