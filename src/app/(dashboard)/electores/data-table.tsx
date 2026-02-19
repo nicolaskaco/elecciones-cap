@@ -200,8 +200,7 @@ export function ElectoresDataTable({ electores, isAdmin, voluntarios }: Props) {
                   )}
                   {isAdmin && (
                     <TableCell className="text-sm text-muted-foreground">
-                      {/* Would show voluntario name, but we only have UUID */}
-                      {e.asignado_a ? 'Asignado' : '-'}
+                      {e.asignado_a ? (voluntarios.find(v => v.id === e.asignado_a)?.nombre ?? '—') : '—'}
                     </TableCell>
                   )}
                   {isAdmin && (
