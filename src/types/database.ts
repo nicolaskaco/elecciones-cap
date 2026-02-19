@@ -171,3 +171,11 @@ export interface LlamadaConDetalles extends Llamada {
   electores: { personas: { nombre: string } }
   perfiles: { nombre: string }
 }
+
+export interface RolListaConPersona extends RolLista {
+  personas: Persona
+}
+
+export interface ComisionConPersona extends ComisionInteres {
+  personas: Persona
+}
