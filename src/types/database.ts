@@ -3,7 +3,7 @@
 // ============================================================
 
 export type UserRol = 'Admin' | 'Voluntario'
-export type ElectorEstado = 'Pendiente' | 'Llamado' | 'Acepto' | 'Sobre_Enviado' | 'Descartado'
+export type ElectorEstado = 'Pendiente' | 'Llamado' | 'Acepto' | 'Para_Enviar' | 'Sobre_Enviado' | 'Descartado'
 export type RolListaTipo =
   | 'Dirigente'
   | 'Comision_Electoral'
@@ -64,6 +64,7 @@ export interface Elector {
   estado: ElectorEstado
   notas: string | null
   asignado_a: string | null
+  enviar_lista: boolean
   created_at: string
   updated_at: string
 }
@@ -96,6 +97,7 @@ export interface PreguntaFlow {
   tipo: PreguntaTipo
   opciones: string[] | null
   activa: boolean
+  accion: string | null
   created_at: string
 }
 

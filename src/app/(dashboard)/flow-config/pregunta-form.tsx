@@ -40,6 +40,7 @@ const schema = z.object({
   tipo: z.enum(['text', 'select', 'boolean'] as const),
   orden_default: z.string().optional(),
   activa: z.boolean(),
+  accion_enviar_lista: z.boolean(),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -62,10 +63,12 @@ export function PreguntaFormDialog({ open, onOpenChange, pregunta }: PreguntaFor
       tipo: 'boolean',
       orden_default: '',
       activa: true,
+      accion_enviar_lista: false,
     },
   })
 
   const tipoWatched = form.watch('tipo')
+  const accionWatched = form.watch('accion_enviar_lista')
 
   useEffect(() => {
     if (open) {
@@ -75,10 +78,11 @@ export function PreguntaFormDialog({ open, onOpenChange, pregunta }: PreguntaFor
           tipo: pregunta.tipo as PreguntaTipo,
           orden_default: pregunta.orden_default?.toString() ?? '',
           activa: pregunta.activa,
+          accion_enviar_lista: pregunta.accion === 'enviar_lista',
         })
         setOpciones(pregunta.opciones ?? [])
       } else {
-        form.reset({ texto: '', tipo: 'boolean', orden_default: '', activa: true })
+        form.reset({ texto: '', tipo: 'boolean', orden_default: '', activa: true, accion_enviar_lista: false })
         setOpciones([])
       }
       setNewOpcion('')
@@ -94,6 +98,7 @@ export function PreguntaFormDialog({ open, onOpenChange, pregunta }: PreguntaFor
         orden_default: values.orden_default ? parseInt(values.orden_default) : null,
         activa: values.activa,
         opciones: values.tipo === 'select' ? opciones : null,
+        accion: values.accion_enviar_lista ? 'enviar_lista' : null,
       }
 
       if (pregunta) {
@@ -227,6 +232,29 @@ export function PreguntaFormDialog({ open, onOpenChange, pregunta }: PreguntaFor
                 </FormItem>
               )}
             />
+            {tipoWatched === 'boolean' && (
+              <FormField
+                control={form.control}
+                name="accion_enviar_lista"
+                render={({ field }) => (
+                  <FormItem className="flex items-center gap-2 space-y-0 rounded-md border p-3 bg-muted/30">
+                    <FormControl>
+                      <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                    </FormControl>
+                    <div className="space-y-0.5">
+                      <FormLabel className="font-normal cursor-pointer">
+                        Acción: Enviar lista
+                      </FormLabel>
+                      {accionWatched && (
+                        <p className="text-xs text-muted-foreground">
+                          Al responder Sí, se mostrará la dirección del elector para confirmar o corregir.
+                        </p>
+                      )}
+                    </div>
+                  </FormItem>
+                )}
+              />
+            )}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancelar
