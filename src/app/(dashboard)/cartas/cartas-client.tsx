@@ -91,15 +91,14 @@ export function CartasClient({ electores }: CartasClientProps) {
               </TableHead>
               <TableHead>Nombre</TableHead>
               <TableHead>Cédula</TableHead>
-              <TableHead>Nº Socio</TableHead>
-              <TableHead>Celular</TableHead>
               <TableHead>Dirección</TableHead>
+              <TableHead>Celular</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {electores.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                   No hay electores pendientes de envío.
                 </TableCell>
               </TableRow>
@@ -119,9 +118,8 @@ export function CartasClient({ electores }: CartasClientProps) {
                   </TableCell>
                   <TableCell className="font-medium">{e.personas.nombre}</TableCell>
                   <TableCell className="text-muted-foreground">{e.personas.cedula ?? '—'}</TableCell>
-                  <TableCell className="text-muted-foreground">{e.personas.nro_socio ?? '—'}</TableCell>
-                  <TableCell className="text-muted-foreground">{e.personas.celular ?? e.personas.telefono ?? '—'}</TableCell>
                   <TableCell className="text-muted-foreground max-w-[200px] truncate">{e.personas.direccion ?? '—'}</TableCell>
+                  <TableCell className="text-muted-foreground">{e.personas.celular ?? e.personas.telefono ?? '—'}</TableCell>
                 </TableRow>
               ))
             )}
