@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
-import type { RolListaConPersona, RolListaTipo } from '@/types/database'
+import type { PersonaConRoles, RolListaConPersona, RolListaTipo } from '@/types/database'
 
 export async function getRolesLista(tipo?: RolListaTipo): Promise<RolListaConPersona[]> {
   await requireAdmin()
@@ -96,5 +96,49 @@ export async function deleteRolLista(rolId: number): Promise<void> {
 
   const { error } = await supabase.from('roles_lista').delete().eq('id', rolId)
   if (error) throw new Error(error.message)
+  revalidatePath('/lista')
+}
+
+export async function getPersonasLista(): Promise<PersonaConRoles[]> {
+  await requireAdmin()
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('personas')
+    .select('*, roles_lista(*)')
+    .not('roles_lista', 'is', null)
+    .order('nombre')
+
+  if (error) throw new Error(error.message)
+  // Filter out personas with no roles_lista entries
+  return ((data ?? []) as PersonaConRoles[]).filter(p => p.roles_lista.length > 0)
+}
+
+export async function updatePersona(
+  personaId: number,
+  data: {
+    nombre: string
+    cedula?: string | null
+    nro_socio?: string | null
+    celular?: string | null
+    direccion?: string | null
+  }
+): Promise<void> {
+  await requireAdmin()
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('personas')
+    .update({
+      nombre: data.nombre,
+      cedula: data.cedula || null,
+      nro_socio: data.nro_socio || null,
+      celular: data.celular || null,
+      direccion: data.direccion || null,
+    })
+    .eq('id', personaId)
+
+  if (error) throw new Error(error.message)
+  revalidatePath('/personas-lista')
   revalidatePath('/lista')
 }
