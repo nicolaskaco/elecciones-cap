@@ -21,6 +21,7 @@ const schema = z.object({
   nombre: z.string().min(1, 'Nombre requerido'),
   descripcion: z.string().optional(),
   fecha: z.string().min(1, 'Fecha requerida'),
+  hora: z.string().optional(),
   direccion: z.string().optional(),
 })
 
@@ -37,7 +38,7 @@ export function EventoFormDialog({ open, onOpenChange, evento }: EventoFormDialo
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { nombre: '', descripcion: '', fecha: '', direccion: '' },
+    defaultValues: { nombre: '', descripcion: '', fecha: '', hora: '', direccion: '' },
   })
 
   useEffect(() => {
@@ -47,6 +48,7 @@ export function EventoFormDialog({ open, onOpenChange, evento }: EventoFormDialo
           nombre: evento.nombre,
           descripcion: evento.descripcion ?? '',
           fecha: evento.fecha,
+          hora: evento.hora ? evento.hora.slice(0, 5) : '',
           direccion: evento.direccion ?? '',
         })
       } else {
@@ -54,6 +56,7 @@ export function EventoFormDialog({ open, onOpenChange, evento }: EventoFormDialo
           nombre: '',
           descripcion: '',
           fecha: new Date().toISOString().split('T')[0],
+          hora: '',
           direccion: '',
         })
       }
@@ -67,6 +70,7 @@ export function EventoFormDialog({ open, onOpenChange, evento }: EventoFormDialo
         nombre: values.nombre,
         descripcion: values.descripcion || null,
         fecha: values.fecha,
+        hora: values.hora || null,
         direccion: values.direccion || null,
       }
       if (evento) {
@@ -99,13 +103,21 @@ export function EventoFormDialog({ open, onOpenChange, evento }: EventoFormDialo
                 <FormMessage />
               </FormItem>
             )} />
-            <FormField control={form.control} name="fecha" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Fecha *</FormLabel>
-                <FormControl><Input {...field} type="date" /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
+            <div className="grid grid-cols-2 gap-3">
+              <FormField control={form.control} name="fecha" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Fecha *</FormLabel>
+                  <FormControl><Input {...field} type="date" /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="hora" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Hora</FormLabel>
+                  <FormControl><Input {...field} type="time" /></FormControl>
+                </FormItem>
+              )} />
+            </div>
             <FormField control={form.control} name="direccion" render={({ field }) => (
               <FormItem>
                 <FormLabel>Dirección</FormLabel>

@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getRequiredPerfil } from '@/lib/auth'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Users, Phone, CheckCircle, TrendingUp, Calendar, MapPin } from 'lucide-react'
+import { Users, Phone, CheckCircle, TrendingUp, Calendar, MapPin, Clock } from 'lucide-react'
 import type { Evento } from '@/types/database'
 
 async function getKPIs() {
@@ -130,6 +130,12 @@ export default async function DashboardPage() {
                         </span>
                         {isToday && <Badge className="text-xs py-0 shrink-0">Hoy</Badge>}
                       </div>
+                      {evento.hora && (
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+                          <Clock className="h-3 w-3 shrink-0" />
+                          <span>{evento.hora.slice(0, 5)}</span>
+                        </div>
+                      )}
                       {evento.direccion && (
                         <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
                           <MapPin className="h-3 w-3 shrink-0" />

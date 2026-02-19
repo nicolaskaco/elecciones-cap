@@ -10,12 +10,16 @@ import { Badge } from '@/components/ui/badge'
 import { EventoFormDialog } from './evento-form'
 import { deleteEvento } from '@/lib/actions/eventos'
 import type { Evento } from '@/types/database'
-import { Plus, Pencil, Trash2, CalendarDays, MapPin } from 'lucide-react'
+import { Plus, Pencil, Trash2, CalendarDays, MapPin, Clock } from 'lucide-react'
 
 function formatFecha(fecha: string) {
   return new Date(fecha + 'T00:00:00').toLocaleDateString('es-UY', {
     weekday: 'short', day: '2-digit', month: 'short', year: 'numeric',
   })
+}
+
+function formatHora(hora: string) {
+  return hora.slice(0, 5)
 }
 
 function getEventoStatus(fecha: string): 'upcoming' | 'today' | 'past' {
@@ -57,12 +61,20 @@ export function EventosClient({ eventos }: EventosClientProps) {
     return (
       <TableRow key={e.id}>
         <TableCell className="whitespace-nowrap">
-          <div className="flex items-center gap-1.5">
-            <CalendarDays className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <span className={status === 'today' ? 'font-semibold text-primary' : ''}>
-              {formatFecha(e.fecha)}
-            </span>
-            {status === 'today' && <Badge className="text-xs py-0">Hoy</Badge>}
+          <div className="flex flex-col gap-0.5">
+            <div className="flex items-center gap-1.5">
+              <CalendarDays className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <span className={status === 'today' ? 'font-semibold text-primary' : ''}>
+                {formatFecha(e.fecha)}
+              </span>
+              {status === 'today' && <Badge className="text-xs py-0">Hoy</Badge>}
+            </div>
+            {e.hora && (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Clock className="h-3 w-3 shrink-0" />
+                {formatHora(e.hora)}
+              </div>
+            )}
           </div>
         </TableCell>
         <TableCell className="font-medium">{e.nombre}</TableCell>

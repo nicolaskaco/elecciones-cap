@@ -22,6 +22,7 @@ export async function createEvento(data: {
   nombre: string
   descripcion?: string | null
   fecha: string
+  hora?: string | null
   direccion?: string | null
 }): Promise<void> {
   await requireAdmin()
@@ -31,6 +32,7 @@ export async function createEvento(data: {
     nombre: data.nombre,
     descripcion: data.descripcion || null,
     fecha: data.fecha,
+    hora: data.hora || null,
     direccion: data.direccion || null,
   })
 
@@ -44,6 +46,7 @@ export async function updateEvento(
     nombre: string
     descripcion?: string | null
     fecha: string
+    hora?: string | null
     direccion?: string | null
   }
 ): Promise<void> {
@@ -56,6 +59,7 @@ export async function updateEvento(
       nombre: data.nombre,
       descripcion: data.descripcion || null,
       fecha: data.fecha,
+      hora: data.hora || null,
       direccion: data.direccion || null,
     })
     .eq('id', id)
