@@ -21,11 +21,20 @@ import { ROL_LABELS } from '@/lib/constants/lista'
 import type { Persona, RolListaConPersona, RolListaTipo } from '@/types/database'
 
 const ROL_TIPOS = Object.keys(ROL_LABELS) as RolListaTipo[]
+const SUFIJOS = ['Titular', '1er Suplente', '2do Suplente'] as const
 
-const DIRIGENTE_NUMEROS = Array.from({ length: 11 }, (_, i) => String(i + 1))
-const DIRIGENTE_SUFIJOS = ['Titular', '1er Suplente', '2do Suplente'] as const
+/** Tipos that use the structured number × suffix picker, and their number range */
+const STRUCTURED_NUMEROS: Partial<Record<RolListaTipo, string[]>> = {
+  Dirigente: Array.from({ length: 11 }, (_, i) => String(i + 1)),
+  Comision_Electoral: Array.from({ length: 3 }, (_, i) => String(i + 1)),
+  Comision_Fiscal: Array.from({ length: 3 }, (_, i) => String(i + 1)),
+}
 
-/** Parses a stored posicion like "3 1er Suplente" → { numero: "3", sufijo: "1er Suplente" } */
+function isStructured(tipo: RolListaTipo): boolean {
+  return tipo in STRUCTURED_NUMEROS
+}
+
+/** Parses "3 1er Suplente" → { numero: "3", sufijo: "1er Suplente" } */
 function parsePosicion(posicion: string | null): { numero: string; sufijo: string } {
   if (!posicion) return { numero: '', sufijo: '' }
   const spaceIdx = posicion.indexOf(' ')
@@ -42,7 +51,7 @@ const schema = z.object({
   quien_lo_trajo: z.string().optional(),
   comentario: z.string().optional(),
 }).superRefine((data, ctx) => {
-  if (data.tipo === 'Dirigente') {
+  if (isStructured(data.tipo)) {
     if (!data.posicion_numero) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Seleccioná un número', path: ['posicion_numero'] })
     }
@@ -77,14 +86,13 @@ export function RolFormDialog({ open, onOpenChange, rol, personas, existingRoles
   const tipoWatched = form.watch('tipo')
   const numeroWatched = form.watch('posicion_numero')
 
-  // Positions already taken by other Dirigentes (excluding the one being edited)
+  // Positions taken by other records of the same tipo (excluding the one being edited)
   const takenPositions = new Set(
     existingRoles
-      .filter(r => r.tipo === 'Dirigente' && r.posicion && r.id !== rol?.id)
+      .filter(r => r.tipo === tipoWatched && r.posicion && r.id !== rol?.id)
       .map(r => r.posicion!)
   )
 
-  // Which sufijos are taken for the currently selected número
   function isTaken(numero: string, sufijo: string) {
     return takenPositions.has(`${numero} ${sufijo}`)
   }
@@ -112,19 +120,19 @@ export function RolFormDialog({ open, onOpenChange, rol, personas, existingRoles
     }
   }, [open, rol, form])
 
-  // Reset sufijo when número changes so a stale taken value doesn't slip through
+  // Clear sufijo when número changes if the current sufijo is now taken
   useEffect(() => {
-    if (tipoWatched === 'Dirigente') {
+    if (isStructured(tipoWatched)) {
       const sufijo = form.getValues('posicion_sufijo')
       if (sufijo && isTaken(numeroWatched ?? '', sufijo)) {
         form.setValue('posicion_sufijo', '')
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [numeroWatched])
+  }, [numeroWatched, tipoWatched])
 
   async function onSubmit(values: FormValues) {
-    const posicion = values.tipo === 'Dirigente'
+    const posicion = isStructured(values.tipo)
       ? `${values.posicion_numero} ${values.posicion_sufijo}`
       : values.posicion || null
 
@@ -154,6 +162,14 @@ export function RolFormDialog({ open, onOpenChange, rol, personas, existingRoles
       setLoading(false)
     }
   }
+
+  const numeros = STRUCTURED_NUMEROS[tipoWatched]
+  const maxLabel = tipoWatched === 'Dirigente' ? '1 – 11' : '1 – 3'
+
+  // For Asamblea_Representativa, show taken positions as a hint
+  const asambleaTaken = tipoWatched === 'Asamblea_Representativa'
+    ? Array.from(takenPositions).sort()
+    : []
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -212,15 +228,17 @@ export function RolFormDialog({ open, onOpenChange, rol, personas, existingRoles
                   </FormItem>
                 )} />
 
-                {tipoWatched === 'Dirigente' ? (
+                {numeros ? (
                   <div className="grid grid-cols-2 gap-3">
                     <FormField control={form.control} name="posicion_numero" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Número *</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl><SelectTrigger><SelectValue placeholder="1 – 11" /></SelectTrigger></FormControl>
+                          <FormControl>
+                            <SelectTrigger><SelectValue placeholder={maxLabel} /></SelectTrigger>
+                          </FormControl>
                           <SelectContent>
-                            {DIRIGENTE_NUMEROS.map(n => (
+                            {numeros.map(n => (
                               <SelectItem key={n} value={n}>{n}</SelectItem>
                             ))}
                           </SelectContent>
@@ -236,9 +254,11 @@ export function RolFormDialog({ open, onOpenChange, rol, personas, existingRoles
                           value={field.value}
                           disabled={!numeroWatched}
                         >
-                          <FormControl><SelectTrigger><SelectValue placeholder="Categoría" /></SelectTrigger></FormControl>
+                          <FormControl>
+                            <SelectTrigger><SelectValue placeholder="Categoría" /></SelectTrigger>
+                          </FormControl>
                           <SelectContent>
-                            {DIRIGENTE_SUFIJOS.map(s => {
+                            {SUFIJOS.map(s => {
                               const taken = isTaken(numeroWatched ?? '', s)
                               return (
                                 <SelectItem key={s} value={s} disabled={taken}>
@@ -256,7 +276,14 @@ export function RolFormDialog({ open, onOpenChange, rol, personas, existingRoles
                   <FormField control={form.control} name="posicion" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Posición</FormLabel>
-                      <FormControl><Input {...field} placeholder="Titular, Suplente, 1er Suplente..." /></FormControl>
+                      <FormControl>
+                        <Input {...field} placeholder="Titular, 1er Suplente..." />
+                      </FormControl>
+                      {asambleaTaken.length > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          Ocupadas: {asambleaTaken.join(', ')}
+                        </p>
+                      )}
                     </FormItem>
                   )} />
                 )}
