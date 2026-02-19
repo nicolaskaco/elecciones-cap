@@ -155,6 +155,7 @@ export interface Evento {
   nombre: string
   descripcion: string | null
   fecha: string
+  hora: string | null
   direccion: string | null
   created_at: string
 }

@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { EventoFormDialog } from './evento-form'
 import { deleteEvento } from '@/lib/actions/eventos'
 import type { Evento } from '@/types/database'
-import { Plus, Pencil, Trash2, CalendarDays, MapPin } from 'lucide-react'
+import { Plus, Pencil, Trash2, CalendarDays, MapPin, Clock } from 'lucide-react'
 
 function formatFecha(fecha: string) {
   return new Date(fecha + 'T00:00:00').toLocaleDateString('es-UY', {
@@ -18,11 +18,22 @@ function formatFecha(fecha: string) {
   })
 }
 
-function getEventoStatus(fecha: string): 'upcoming' | 'today' | 'past' {
-  const today = new Date().toISOString().split('T')[0]
-  if (fecha === today) return 'today'
-  return fecha > today ? 'upcoming' : 'past'
+function formatHora(hora: string) {
+  return hora.slice(0, 5)
 }
+
+function getEventDateTime(fecha: string, hora: string | null): Date {
+  const base = new Date(fecha + 'T00:00:00')
+  if (hora) {
+    const [h, m] = hora.split(':').map(Number)
+    base.setHours(h, m, 0, 0)
+  } else {
+    // No time set: treat as end of day so the whole day counts as upcoming
+    base.setHours(23, 59, 59, 999)
+  }
+  return base
+}
+
 
 interface EventosClientProps {
   eventos: Evento[]
@@ -33,9 +44,9 @@ export function EventosClient({ eventos }: EventosClientProps) {
   const [editingEvento, setEditingEvento] = useState<Evento | null>(null)
   const [, startTransition] = useTransition()
 
-  const today = new Date().toISOString().split('T')[0]
-  const upcoming = eventos.filter(e => e.fecha >= today)
-  const past = eventos.filter(e => e.fecha < today)
+  const now = new Date()
+  const upcoming = eventos.filter(e => getEventDateTime(e.fecha, e.hora) > now)
+  const past = eventos.filter(e => getEventDateTime(e.fecha, e.hora) <= now)
 
   function openCreate() { setEditingEvento(null); setFormOpen(true) }
   function openEdit(e: Evento) { setEditingEvento(e); setFormOpen(true) }
@@ -53,16 +64,25 @@ export function EventosClient({ eventos }: EventosClientProps) {
   }
 
   function EventoRow({ e }: { e: Evento }) {
-    const status = getEventoStatus(e.fecha)
     return (
       <TableRow key={e.id}>
         <TableCell className="whitespace-nowrap">
-          <div className="flex items-center gap-1.5">
-            <CalendarDays className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <span className={status === 'today' ? 'font-semibold text-primary' : ''}>
-              {formatFecha(e.fecha)}
-            </span>
-            {status === 'today' && <Badge className="text-xs py-0">Hoy</Badge>}
+          <div className="flex flex-col gap-0.5">
+            <div className="flex items-center gap-1.5">
+              <CalendarDays className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <span className={e.fecha === new Date().toISOString().split('T')[0] ? 'font-semibold text-primary' : ''}>
+                {formatFecha(e.fecha)}
+              </span>
+              {e.fecha === new Date().toISOString().split('T')[0] && (
+                <Badge className="text-xs py-0">Hoy</Badge>
+              )}
+            </div>
+            {e.hora && (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Clock className="h-3 w-3 shrink-0" />
+                {formatHora(e.hora)}
+              </div>
+            )}
           </div>
         </TableCell>
         <TableCell className="font-medium">{e.nombre}</TableCell>

@@ -1,0 +1,5 @@
+BEGIN;
+
+ALTER TABLE eventos ADD COLUMN hora time;
+
+COMMIT;

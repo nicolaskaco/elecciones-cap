@@ -1,7 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { getRequiredPerfil } from '@/lib/auth'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Users, Phone, CheckCircle, TrendingUp, Calendar } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Users, Phone, CheckCircle, TrendingUp, Calendar, MapPin, Clock } from 'lucide-react'
+import type { Evento } from '@/types/database'
 
 async function getKPIs() {
   const supabase = await createClient()
@@ -23,8 +25,39 @@ async function getKPIs() {
   return { totalElectores, totalLlamadas, electoresAceptaron, tasa }
 }
 
+async function getUpcomingEventos(): Promise<Evento[]> {
+  const supabase = await createClient()
+  const today = new Date().toISOString().split('T')[0]
+  const { data } = await supabase
+    .from('eventos')
+    .select('*')
+    .gte('fecha', today)
+    .order('fecha', { ascending: true })
+    .limit(20)
+
+  const now = new Date()
+  return ((data ?? []) as Evento[])
+    .filter((e) => {
+      const base = new Date(e.fecha + 'T00:00:00')
+      if (e.hora) {
+        const [h, m] = e.hora.split(':').map(Number)
+        base.setHours(h, m, 0, 0)
+      } else {
+        base.setHours(23, 59, 59, 999)
+      }
+      return base > now
+    })
+    .slice(0, 5)
+}
+
+function formatFecha(fecha: string) {
+  return new Date(fecha + 'T00:00:00').toLocaleDateString('es-UY', {
+    weekday: 'short', day: '2-digit', month: 'short', year: 'numeric',
+  })
+}
+
 export default async function DashboardPage() {
-  const [perfil, kpis] = await Promise.all([getRequiredPerfil(), getKPIs()])
+  const [perfil, kpis, eventos] = await Promise.all([getRequiredPerfil(), getKPIs(), getUpcomingEventos()])
 
   const cards = [
     {
@@ -87,9 +120,53 @@ export default async function DashboardPage() {
           <CardDescription>Calendario de la campaña</CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">
-            No hay eventos próximos. Los eventos se mostrarán aquí una vez agregados.
-          </p>
+          {eventos.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No hay eventos próximos.</p>
+          ) : (
+            <ul className="space-y-3">
+              {eventos.map((evento) => {
+                const isToday = evento.fecha === new Date().toISOString().split('T')[0]
+                return (
+                  <li key={evento.id} className="flex items-start gap-3">
+                    <div className="flex flex-col items-center justify-center rounded-md border bg-muted px-2 py-1 min-w-[3rem] text-center">
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(evento.fecha + 'T00:00:00').toLocaleDateString('es-UY', { month: 'short' }).toUpperCase()}
+                      </span>
+                      <span className="text-lg font-bold leading-none">
+                        {new Date(evento.fecha + 'T00:00:00').getDate()}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-sm font-medium truncate ${isToday ? 'text-primary' : ''}`}>
+                          {evento.nombre}
+                        </span>
+                        {isToday && <Badge className="text-xs py-0 shrink-0">Hoy</Badge>}
+                      </div>
+                      {evento.hora && (
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+                          <Clock className="h-3 w-3 shrink-0" />
+                          <span>{evento.hora.slice(0, 5)}</span>
+                        </div>
+                      )}
+                      {evento.direccion && (
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+                          <MapPin className="h-3 w-3 shrink-0" />
+                          <span className="truncate">{evento.direccion}</span>
+                        </div>
+                      )}
+                      {evento.descripcion && (
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{evento.descripcion}</p>
+                      )}
+                    </div>
+                    <span className="text-xs text-muted-foreground shrink-0 pt-1">
+                      {formatFecha(evento.fecha)}
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
         </CardContent>
       </Card>
     </div>
