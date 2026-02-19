@@ -1,4 +1,4 @@
-# Elecciones Peñarol — Spec Técnico 
+# Elecciones Peñarol — Spec Técnico
 
 ## Overview
 App web responsive (desktop + mobile) para gestionar la campaña electoral de una lista en Peñarol. Permite gestionar electores, realizar campañas de llamadas con flow dinámico, enviar emails segmentados, trackear gastos, organizar eventos y gestionar los integrantes de la lista.
@@ -9,7 +9,7 @@ App web responsive (desktop + mobile) para gestionar la campaña electoral de un
 - **Hosting:** Vercel (free tier)
 - **Email:** Resend (free tier — 100 emails/día)
 - **PDF cartas:** react-pdf o jsPDF (client-side)
-- **Excel import:** SheetJS (xlsx)
+- **Excel import/export:** SheetJS (xlsx)
 
 ## Roles de Usuario
 | Rol | Acceso |
@@ -23,11 +23,13 @@ Auth via Supabase Auth (email/password). Rol almacenado en tabla `perfiles` con 
 
 ## Data Model
 
+> **Nota sobre IDs:** Todas las tablas usan `bigint` serial como PK, excepto `perfiles.id` que es `uuid` (= `auth.users.id`). Las FK que referencian tablas con `bigint` PK también son `bigint`.
+
 ### personas
 Tabla central de personas. Puede ser elector, integrante de lista, o ambos.
 | Campo | Tipo | Notas |
 |-------|------|-------|
-| id | uuid PK | |
+| id | bigint PK (serial) | |
 | nombre | text | Nombre completo |
 | fecha_nacimiento | date | |
 | cedula | text | Unique |
@@ -43,10 +45,11 @@ Tabla central de personas. Puede ser elector, integrante de lista, o ambos.
 Extiende personas con datos electorales.
 | Campo | Tipo | Notas |
 |-------|------|-------|
-| id | uuid PK | |
-| persona_id | uuid FK → personas | |
-| estado | enum | Pendiente, Llamado, Aceptó, Sobre Enviado, Descartado |
+| id | bigint PK (serial) | |
+| persona_id | bigint FK → personas | |
+| estado | enum | Pendiente, Llamado, Confirmado, Para_Enviar, Lista_Enviada, Numero_Incorrecto, Descartado |
 | asignado_a | uuid FK → perfiles | Voluntario asignado |
+| enviar_lista | boolean | default false — marcado para envío de lista |
 | notas | text | |
 | created_at | timestamptz | |
 | updated_at | timestamptz | |
@@ -55,55 +58,58 @@ Extiende personas con datos electorales.
 Una persona puede tener múltiples roles en la lista.
 | Campo | Tipo | Notas |
 |-------|------|-------|
-| id | uuid PK | |
-| persona_id | uuid FK → personas | |
-| tipo | enum | Dirigente, Comisión Electoral, Comisión Fiscal, Asamblea Representativa |
-| posicion | text | 1-11, 1er Suplente, 2do Suplente (Dirigentes) o nº posición (Asamblea) |
-| quien_lo_trajo | text | Solo Asamblea |
+| id | bigint PK (serial) | |
+| persona_id | bigint FK → personas | |
+| tipo | enum | Dirigente, Comision_Electoral, Comision_Fiscal, Asamblea_Representativa |
+| posicion | text | Para roles estructurados: "1 Titular", "1 1er Suplente", "2 2do Suplente"; para Asamblea: número |
+| quien_lo_trajo | text | Aplica a todos los tipos |
 | comentario | text | |
 | created_at | timestamptz | |
 
 ### comisiones_interes
-Qué comisión le interesa integrar a cada persona.
+Qué comisión le interesa integrar a cada persona. *(Tabla creada, página pendiente de implementar)*
 | Campo | Tipo | Notas |
 |-------|------|-------|
-| id | uuid PK | |
-| persona_id | uuid FK → personas | |
-| comision | enum | Fútbol, Formativas, Basketball, Deportes Anexos, Social, Infraestructura, AUFI |
+| id | bigint PK (serial) | |
+| persona_id | bigint FK → personas | |
+| comision | enum | Futbol, Formativas, Basketball, Deportes_Anexos, Social, Infraestructura, AUFI |
 | created_at | timestamptz | |
 
 ### preguntas_flow
 Preguntas del cuestionario de llamadas. Admin las configura.
 | Campo | Tipo | Notas |
 |-------|------|-------|
-| id | uuid PK | |
+| id | bigint PK (serial) | |
 | texto | text | Texto de la pregunta |
 | tipo | enum | text, select, boolean |
 | opciones | jsonb | Array de opciones para tipo select: ["A", "B", "C"] |
 | orden_default | int | Orden si no hay regla de branching |
 | activa | boolean | default true |
+| accion | text | Identificador de acción opcional |
+| resultado_si | LlamadaResultado | Resultado automático si respuesta boolean es "si" |
+| resultado_no | LlamadaResultado | Resultado automático si respuesta boolean es "no" |
 | created_at | timestamptz | |
 
 ### reglas_flow
 Branching condicional entre preguntas.
 | Campo | Tipo | Notas |
 |-------|------|-------|
-| id | uuid PK | |
-| pregunta_origen_id | uuid FK → preguntas_flow | |
-| respuesta_valor | text | Valor que activa la regla |
-| pregunta_destino_id | uuid FK → preguntas_flow | Siguiente pregunta si match |
+| id | bigint PK (serial) | |
+| pregunta_origen_id | bigint FK → preguntas_flow | |
+| respuesta_valor | text \| null | Valor que activa la regla |
+| pregunta_destino_id | bigint \| null FK → preguntas_flow | Siguiente pregunta; null = terminar flow |
 | created_at | timestamptz | |
 
-Lógica: al responder una pregunta, buscar en reglas_flow si hay match. Si hay → ir a pregunta_destino. Si no → seguir orden_default.
+Lógica: al responder una pregunta, buscar en reglas_flow si hay match. Si hay → ir a pregunta_destino (o terminar si es null). Si no → seguir orden_default.
 
 ### llamadas
 Registro de cada llamada realizada.
 | Campo | Tipo | Notas |
 |-------|------|-------|
-| id | uuid PK | |
-| elector_id | uuid FK → electores | |
+| id | bigint PK (serial) | |
+| elector_id | bigint FK → electores | |
 | voluntario_id | uuid FK → perfiles | Quién llamó |
-| resultado | enum | No Atendió, Número Incorrecto, Nos Vota, No Nos Vota |
+| resultado | enum | No_Atendio, Numero_Incorrecto, Nos_Vota, No_Nos_Vota |
 | fecha | timestamptz | |
 | created_at | timestamptz | |
 
@@ -111,21 +117,21 @@ Registro de cada llamada realizada.
 Respuestas individuales a cada pregunta del flow.
 | Campo | Tipo | Notas |
 |-------|------|-------|
-| id | uuid PK | |
-| llamada_id | uuid FK → llamadas | |
-| pregunta_id | uuid FK → preguntas_flow | |
-| respuesta | text | |
+| id | bigint PK (serial) | |
+| llamada_id | bigint FK → llamadas | |
+| pregunta_id | bigint FK → preguntas_flow | |
+| valor | text \| null | Respuesta dada |
 | created_at | timestamptz | |
 
 ### campanas_email
 Campañas de email marketing.
 | Campo | Tipo | Notas |
 |-------|------|-------|
-| id | uuid PK | |
-| nombre | text | |
+| id | bigint PK (serial) | |
+| nombre | text \| null | |
 | asunto | text | Subject del email |
 | template_html | text | HTML con variables {{nombre}}, etc. |
-| segmento | jsonb | Filtros: rango edad, resultado llamada, estado, etc. |
+| segmento | text \| null | Filtros serializados |
 | estado | enum | Borrador, Enviando, Enviada |
 | enviados | int | Counter |
 | created_at | timestamptz | |
@@ -134,9 +140,9 @@ Campañas de email marketing.
 Tracking de gastos de campaña.
 | Campo | Tipo | Notas |
 |-------|------|-------|
-| id | uuid PK | |
+| id | bigint PK (serial) | |
 | concepto | text | Descripción del gasto |
-| rubro | enum | Publicidad Radio, TV, Redes, Comida, Evento, Sonido, Community Manager, Diseñador Gráfico |
+| rubro | enum | Publicidad_Radio, TV, Redes, Comida, Evento, Sonido, Community_Manager, Disenador_Grafico |
 | monto | decimal | En pesos |
 | programa_campana | text | A qué programa/campaña pertenece |
 | quien_pago | text | |
@@ -147,9 +153,10 @@ Tracking de gastos de campaña.
 Charlas, reuniones, eventos de campaña.
 | Campo | Tipo | Notas |
 |-------|------|-------|
-| id | uuid PK | |
+| id | bigint PK (serial) | |
 | nombre | text | Ej: "Reunión COET" |
-| fecha | timestamptz | |
+| fecha | date | |
+| hora | time \| null | Hora de inicio (opcional) |
 | direccion | text | |
 | descripcion | text | |
 | created_at | timestamptz | |
@@ -162,55 +169,63 @@ Usuarios de la app (extends Supabase Auth).
 | nombre | text | |
 | email | text | |
 | rol | enum | Admin, Voluntario |
+| avatar_url | text \| null | |
 | created_at | timestamptz | |
+| updated_at | timestamptz | |
 
 ---
 
 ## Páginas / Vistas
 
 ### Home / Dashboard
-- Calendario semanal/mensual con eventos
-- KPIs: llamadas hoy, llamadas totales, % electores contactados, % aceptaron sobre
-- Gráfico de progreso
+- KPI cards (llamadas hoy, llamadas totales, % electores contactados, % aceptaron)
+- Lista de próximos eventos (los 5 próximos, ordenados por fecha+hora)
 
 ### Electores
-- **Admin:** Tabla completa con búsqueda, filtros por estado, export CSV
+- **Admin:** Tabla completa con búsqueda, filtros por estado, export Excel
 - **Voluntario:** Solo ve los asignados (nombre + celular)
 - Import desde Excel (Admin)
 - Click en elector → detalle con historial de llamadas
 
 ### Flow de Llamada
 - Voluntario selecciona elector → inicia flow
-- Una pregunta a la vez, branching automático
+- Una pregunta a la vez, branching automático por reglas_flow
 - Al finalizar: registra resultado y actualiza estado del elector
 - Admin ve el historial completo de respuestas por elector
 
 ### Configuración del Flow (Admin)
 - CRUD de preguntas
-- Definir opciones por pregunta
-- Configurar reglas de branching (si responde X → ir a pregunta Y)
-- Preview del flow
+- Definir opciones por pregunta (tipo select)
+- Configurar reglas de branching (si responde X → ir a pregunta Y, o terminar flow)
 
-### Integrantes de la Lista
-- Tabla de personas con sus roles
-- Filtrar por tipo: Dirigente, Comisión Electoral, Comisión Fiscal, Asamblea
-- Una persona puede tener múltiples roles
+### Personas de la Lista (`/personas-lista`)
+- Tabla de personas con sus roles en la lista (badges)
+- Búsqueda por nombre o cédula
+- CRUD: crear/editar datos de personas
+- Import desde Excel (columnas de tabla personas)
+- Export a Excel (selección de campos)
+
+### Integrantes de la Lista (`/lista`)
+- Tabla de roles con persona asociada
+- Filtrar por tipo: Dirigente, Comisión Electoral, Comisión Fiscal, Asamblea Representativa
+- Orden: por tipo, luego por número de posición, luego por sufijo (Titular → 1er Suplente → 2do Suplente)
 - CRUD completo (Admin)
+- Import desde Excel (persona debe existir previamente)
+- Export a Excel (selección de campos; exporta solo los filtrados)
 
-### Comisiones de Interés
+### Comisiones de Interés *(pendiente)*
 - Ver qué personas quieren integrar qué comisiones
 - Filtrar por comisión
 
-### Campañas de Email (Admin)
+### Campañas de Email (Admin) *(pendiente)*
 - Crear campaña con template HTML
 - Definir segmento (edad, resultado llamada, etc.)
 - Preview con datos reales
 - Enviar (via Resend API)
 
-### Carta Personalizada (Admin)
+### Carta Personalizada (Admin) *(pendiente)*
 - Template genérico con {{nombre}} dinámico
 - Generar PDFs individuales o batch para imprimir
-- Filtro: electores con estado "Aceptó"
 
 ### Gastos (Admin)
 - CRUD de gastos
@@ -218,8 +233,8 @@ Usuarios de la app (extends Supabase Auth).
 - Totales por rubro y general
 
 ### Eventos (Admin)
-- CRUD de eventos
-- Vista calendario (integrada con Home)
+- CRUD de eventos con fecha y hora opcional
+- Split view: Próximos / Pasados (corte por datetime actual, considera hora si existe)
 
 ### Usuarios (Admin)
 - Crear/editar usuarios
@@ -232,12 +247,24 @@ Usuarios de la app (extends Supabase Auth).
 1. Admin sube archivo .xlsx
 2. App parsea con SheetJS
 3. Muestra preview de datos mapeados
-4. Confirma → insert batch en personas + electores
-5. Manejo de duplicados por cédula o nro_socio
+4. Confirma → insert batch
+
+Disponible para:
+- **Electores:** inserta en `personas` + `electores` (upsert por cédula)
+- **Personas de la Lista:** upsert en `personas` (por cédula)
+- **Integrantes de la Lista:** inserta en `roles_lista` (persona debe existir; busca por cédula o nombre exacto)
 
 ---
 
-## Carta Personalizada
+## Export Excel
+- Disponible en Electores, Personas de la Lista, Integrantes de la Lista
+- Dialog con selección de campos (checkboxes); algunos marcados por defecto
+- Exporta solo los datos actualmente filtrados
+- Nombre de archivo incluye timestamp `_YYYY-MM-DD_HH-mm`
+
+---
+
+## Carta Personalizada *(pendiente)*
 - Template almacenado como HTML/texto con variables: {{nombre}}, {{direccion}}, {{nro_socio}}
 - Genera PDF con react-pdf
 - Batch export: un PDF con todas las cartas para imprimir
@@ -251,50 +278,50 @@ Usuarios de la app (extends Supabase Auth).
 
 ---
 
-## Estructura de Archivos (sugerida)
+## Estructura de Archivos
 ```
 src/
 ├── app/
 │   ├── layout.tsx
-│   ├── page.tsx              # Home/Dashboard
+│   ├── page.tsx
 │   ├── login/
-│   ├── electores/
-│   │   ├── page.tsx          # Lista
-│   │   ├── [id]/page.tsx     # Detalle
-│   │   └── import/page.tsx   # Import Excel
-│   ├── llamadas/
-│   │   ├── page.tsx          # Mis asignados (voluntario) o todos (admin)
-│   │   └── flow/[electorId]/page.tsx  # Flow de llamada
-│   ├── flow-config/          # Admin: configurar preguntas
-│   ├── lista/                # Integrantes de la lista
-│   ├── comisiones/           # Interés en comisiones
-│   ├── campanas/             # Email campaigns
-│   ├── cartas/               # Carta personalizada + PDF
-│   ├── gastos/
-│   ├── eventos/
-│   └── usuarios/             # Admin: gestión usuarios
+│   └── (dashboard)/
+│       ├── layout.tsx            # Auth guard — getRequiredPerfil()
+│       ├── page.tsx              # Home/Dashboard
+│       ├── electores/
+│       │   ├── page.tsx          # Lista
+│       │   └── [id]/page.tsx     # Detalle
+│       ├── llamadas/
+│       │   ├── page.tsx
+│       │   └── flow/[electorId]/page.tsx
+│       ├── flow-config/          # Admin: configurar preguntas
+│       ├── lista/                # Integrantes de la lista
+│       ├── personas-lista/       # Datos personales de integrantes
+│       ├── campanas/             # Email campaigns (stub)
+│       ├── cartas/               # Carta personalizada + PDF (stub)
+│       ├── gastos/
+│       ├── eventos/
+│       └── usuarios/
 ├── components/
-│   ├── ui/                   # shadcn components
-│   ├── Calendar.tsx
-│   ├── FlowEngine.tsx        # Motor del flow de preguntas
-│   ├── KPICards.tsx
-│   └── DataTable.tsx
+│   ├── ui/                       # shadcn components (no editar)
+│   └── export-dialog.tsx         # Componente reutilizable de export Excel
 ├── lib/
-│   ├── supabase.ts
-│   ├── resend.ts
-│   └── utils.ts
+│   ├── actions/                  # Server Actions (mutations)
+│   ├── supabase/                 # Clientes server/client
+│   ├── validations/              # Zod schemas
+│   └── constants/
 └── types/
-    └── database.ts           # Types generados por Supabase
+    └── database.ts               # Tipos e interfaces de DB (fuente de verdad)
 ```
 
 ---
 
-## Orden de Desarrollo Sugerido
-1. **Setup:** Supabase project + Vercel + React app base + Auth + RLS
-2. **Personas + Electores:** CRUD + Import Excel
-3. **Flow de Llamada:** Preguntas, reglas, motor del flow, registro
-4. **Dashboard:** Calendario + KPIs
-5. **Integrantes Lista + Comisiones**
-6. **Gastos + Eventos**
-7. **Campañas Email + Carta PDF**
-8. **Polish:** Búsqueda, filtros, export, responsive
+## Estado de Desarrollo
+1. ✅ Setup: Supabase + Vercel + Auth + RLS
+2. ✅ Personas + Electores: CRUD + Import Excel
+3. ✅ Flow de Llamada: preguntas, reglas, motor, registro
+4. ✅ Dashboard: KPIs + próximos eventos
+5. ✅ Integrantes Lista + Personas de la Lista
+6. ✅ Gastos + Eventos
+7. ⏳ Campañas Email + Carta PDF (stubs)
+8. ✅ Export Excel + Import para Lista/Personas Lista
