@@ -104,12 +104,13 @@ export function RolFormDialog({ open, onOpenChange, rol }: RolFormDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md flex flex-col max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>{rol ? 'Editar integrante' : 'Nuevo integrante'}</DialogTitle>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col min-h-0">
+            <div className="overflow-y-auto flex-1 space-y-4 pr-1">
             {!rol && (
               <div className="space-y-3 rounded-md border p-3 bg-muted/30">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Persona</p>
@@ -181,7 +182,8 @@ export function RolFormDialog({ open, onOpenChange, rol }: RolFormDialogProps) {
               )} />
             </div>
 
-            <DialogFooter>
+            </div>
+            <DialogFooter className="pt-4">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
               <Button type="submit" disabled={loading}>{loading ? 'Guardando...' : 'Guardar'}</Button>
             </DialogFooter>
