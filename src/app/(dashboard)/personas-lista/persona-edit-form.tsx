@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { updatePersona } from '@/lib/actions/lista'
+import { createPersona, updatePersona } from '@/lib/actions/lista'
 import type { PersonaConRoles } from '@/types/database'
 
 const schema = z.object({
@@ -22,48 +22,65 @@ const schema = z.object({
   nro_socio: z.string().optional(),
   celular: z.string().optional(),
   direccion: z.string().optional(),
+  fecha_nacimiento: z.string().optional(),
+  email: z.string().email('Correo inválido').optional().or(z.literal('')),
 })
 
 type FormValues = z.infer<typeof schema>
 
+const EMPTY: FormValues = {
+  nombre: '', cedula: '', nro_socio: '', celular: '',
+  direccion: '', fecha_nacimiento: '', email: '',
+}
+
 interface PersonaEditFormProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  persona: PersonaConRoles | null
+  persona: PersonaConRoles | null  // null = create mode
 }
 
 export function PersonaEditForm({ open, onOpenChange, persona }: PersonaEditFormProps) {
   const [loading, setLoading] = useState(false)
+  const isEdit = persona !== null
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { nombre: '', cedula: '', nro_socio: '', celular: '', direccion: '' },
+    defaultValues: EMPTY,
   })
 
   useEffect(() => {
-    if (open && persona) {
-      form.reset({
+    if (open) {
+      form.reset(isEdit ? {
         nombre: persona.nombre,
         cedula: persona.cedula ?? '',
         nro_socio: persona.nro_socio ?? '',
         celular: persona.celular ?? '',
         direccion: persona.direccion ?? '',
-      })
+        fecha_nacimiento: persona.fecha_nacimiento ?? '',
+        email: persona.email ?? '',
+      } : EMPTY)
     }
-  }, [open, persona, form])
+  }, [open, persona, isEdit, form])
 
   async function onSubmit(values: FormValues) {
-    if (!persona) return
     setLoading(true)
     try {
-      await updatePersona(persona.id, {
+      const payload = {
         nombre: values.nombre,
         cedula: values.cedula || null,
         nro_socio: values.nro_socio || null,
         celular: values.celular || null,
         direccion: values.direccion || null,
-      })
-      toast.success('Persona actualizada')
+        fecha_nacimiento: values.fecha_nacimiento || null,
+        email: values.email || null,
+      }
+      if (isEdit) {
+        await updatePersona(persona.id, payload)
+        toast.success('Persona actualizada')
+      } else {
+        await createPersona(payload)
+        toast.success('Persona creada')
+      }
       onOpenChange(false)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al guardar')
@@ -74,46 +91,63 @@ export function PersonaEditForm({ open, onOpenChange, persona }: PersonaEditForm
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md flex flex-col max-h-[90vh]">
         <DialogHeader>
-          <DialogTitle>Editar persona</DialogTitle>
+          <DialogTitle>{isEdit ? 'Editar persona' : 'Nueva persona'}</DialogTitle>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField control={form.control} name="nombre" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Nombre *</FormLabel>
-                <FormControl><Input {...field} placeholder="Nombre completo" /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <div className="grid grid-cols-2 gap-3">
-              <FormField control={form.control} name="cedula" render={({ field }) => (
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col min-h-0">
+            <div className="overflow-y-auto flex-1 space-y-4 pr-1">
+              <FormField control={form.control} name="nombre" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Cédula</FormLabel>
-                  <FormControl><Input {...field} placeholder="1.234.567-8" /></FormControl>
+                  <FormLabel>Nombre *</FormLabel>
+                  <FormControl><Input {...field} placeholder="Nombre completo" /></FormControl>
+                  <FormMessage />
                 </FormItem>
               )} />
-              <FormField control={form.control} name="nro_socio" render={({ field }) => (
+              <div className="grid grid-cols-2 gap-3">
+                <FormField control={form.control} name="cedula" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cédula</FormLabel>
+                    <FormControl><Input {...field} placeholder="1.234.567-8" /></FormControl>
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="nro_socio" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nº Socio</FormLabel>
+                    <FormControl><Input {...field} placeholder="123456" /></FormControl>
+                  </FormItem>
+                )} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <FormField control={form.control} name="celular" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Celular</FormLabel>
+                    <FormControl><Input {...field} placeholder="099 123 456" /></FormControl>
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="fecha_nacimiento" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Fecha de nacimiento</FormLabel>
+                    <FormControl><Input {...field} type="date" /></FormControl>
+                  </FormItem>
+                )} />
+              </div>
+              <FormField control={form.control} name="email" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Nº Socio</FormLabel>
-                  <FormControl><Input {...field} placeholder="123456" /></FormControl>
+                  <FormLabel>Correo electrónico</FormLabel>
+                  <FormControl><Input {...field} type="email" placeholder="nombre@email.com" /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="direccion" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Dirección</FormLabel>
+                  <FormControl><Input {...field} placeholder="Calle 1234" /></FormControl>
                 </FormItem>
               )} />
             </div>
-            <FormField control={form.control} name="celular" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Celular</FormLabel>
-                <FormControl><Input {...field} placeholder="099 123 456" /></FormControl>
-              </FormItem>
-            )} />
-            <FormField control={form.control} name="direccion" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Dirección</FormLabel>
-                <FormControl><Input {...field} placeholder="Calle 1234" /></FormControl>
-              </FormItem>
-            )} />
-            <DialogFooter>
+            <DialogFooter className="pt-4">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
               <Button type="submit" disabled={loading}>{loading ? 'Guardando...' : 'Guardar'}</Button>
             </DialogFooter>

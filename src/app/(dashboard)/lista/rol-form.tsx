@@ -18,15 +18,12 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { createRolLista, updateRolLista } from '@/lib/actions/lista'
 import { ROL_LABELS } from '@/lib/constants/lista'
-import type { RolListaConPersona, RolListaTipo } from '@/types/database'
+import type { Persona, RolListaConPersona, RolListaTipo } from '@/types/database'
 
 const ROL_TIPOS = Object.keys(ROL_LABELS) as RolListaTipo[]
 
 const schema = z.object({
-  nombre: z.string().min(1, 'Nombre requerido'),
-  cedula: z.string().optional(),
-  nro_socio: z.string().optional(),
-  celular: z.string().optional(),
+  persona_id: z.string().min(1, 'Seleccioná una persona'),
   tipo: z.enum(['Dirigente', 'Comision_Electoral', 'Comision_Fiscal', 'Asamblea_Representativa'] as const),
   posicion: z.string().optional(),
   quien_lo_trajo: z.string().optional(),
@@ -39,16 +36,16 @@ interface RolFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   rol?: RolListaConPersona | null
+  personas: Persona[]
 }
 
-export function RolFormDialog({ open, onOpenChange, rol }: RolFormDialogProps) {
+export function RolFormDialog({ open, onOpenChange, rol, personas }: RolFormDialogProps) {
   const [loading, setLoading] = useState(false)
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      nombre: '', cedula: '', nro_socio: '', celular: '',
-      tipo: 'Dirigente', posicion: '', quien_lo_trajo: '', comentario: '',
+      persona_id: '', tipo: 'Dirigente', posicion: '', quien_lo_trajo: '', comentario: '',
     },
   })
 
@@ -58,10 +55,7 @@ export function RolFormDialog({ open, onOpenChange, rol }: RolFormDialogProps) {
     if (open) {
       if (rol) {
         form.reset({
-          nombre: rol.personas.nombre,
-          cedula: rol.personas.cedula ?? '',
-          nro_socio: rol.personas.nro_socio ?? '',
-          celular: rol.personas.celular ?? '',
+          persona_id: rol.persona_id.toString(),
           tipo: rol.tipo,
           posicion: rol.posicion ?? '',
           quien_lo_trajo: rol.quien_lo_trajo ?? '',
@@ -69,8 +63,7 @@ export function RolFormDialog({ open, onOpenChange, rol }: RolFormDialogProps) {
         })
       } else {
         form.reset({
-          nombre: '', cedula: '', nro_socio: '', celular: '',
-          tipo: 'Dirigente', posicion: '', quien_lo_trajo: '', comentario: '',
+          persona_id: '', tipo: 'Dirigente', posicion: '', quien_lo_trajo: '', comentario: '',
         })
       }
     }
@@ -88,10 +81,12 @@ export function RolFormDialog({ open, onOpenChange, rol }: RolFormDialogProps) {
         })
         toast.success('Integrante actualizado')
       } else {
-        await createRolLista(
-          { nombre: values.nombre, cedula: values.cedula || null, nro_socio: values.nro_socio || null, celular: values.celular || null },
-          { tipo: values.tipo, posicion: values.posicion || null, quien_lo_trajo: values.quien_lo_trajo || null, comentario: values.comentario || null }
-        )
+        await createRolLista(parseInt(values.persona_id), {
+          tipo: values.tipo,
+          posicion: values.posicion || null,
+          quien_lo_trajo: values.quien_lo_trajo || null,
+          comentario: values.comentario || null,
+        })
         toast.success('Integrante agregado')
       }
       onOpenChange(false)
@@ -111,77 +106,73 @@ export function RolFormDialog({ open, onOpenChange, rol }: RolFormDialogProps) {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col min-h-0">
             <div className="overflow-y-auto flex-1 space-y-4 pr-1">
-            {!rol && (
-              <div className="space-y-3 rounded-md border p-3 bg-muted/30">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Persona</p>
-                <FormField control={form.control} name="nombre" render={({ field }) => (
+              {!rol && (
+                <FormField control={form.control} name="persona_id" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Nombre *</FormLabel>
-                    <FormControl><Input {...field} placeholder="Nombre completo" /></FormControl>
+                    <FormLabel>Persona *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar persona..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {personas.map(p => (
+                          <SelectItem key={p.id} value={p.id.toString()}>
+                            {p.nombre}{p.cedula ? ` — ${p.cedula}` : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )} />
-                <div className="grid grid-cols-2 gap-3">
-                  <FormField control={form.control} name="cedula" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Cédula</FormLabel>
-                      <FormControl><Input {...field} placeholder="1.234.567-8" /></FormControl>
-                    </FormItem>
-                  )} />
-                  <FormField control={form.control} name="nro_socio" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nº Socio</FormLabel>
-                      <FormControl><Input {...field} placeholder="123456" /></FormControl>
-                    </FormItem>
-                  )} />
+              )}
+
+              {rol && (
+                <div className="rounded-md border px-3 py-2 bg-muted/30 text-sm">
+                  <span className="text-muted-foreground text-xs uppercase tracking-wide font-medium">Persona</span>
+                  <p className="font-medium mt-0.5">{rol.personas.nombre}</p>
                 </div>
-                <FormField control={form.control} name="celular" render={({ field }) => (
+              )}
+
+              <div className="space-y-3 rounded-md border p-3 bg-muted/30">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Rol en la lista</p>
+                <FormField control={form.control} name="tipo" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Celular</FormLabel>
-                    <FormControl><Input {...field} placeholder="099 123 456" /></FormControl>
+                    <FormLabel>Tipo *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        {ROL_TIPOS.map(t => (
+                          <SelectItem key={t} value={t}>{ROL_LABELS[t]}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="posicion" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Posición</FormLabel>
+                    <FormControl><Input {...field} placeholder="1, 2, 1er Suplente..." /></FormControl>
+                  </FormItem>
+                )} />
+                {tipoWatched === 'Asamblea_Representativa' && (
+                  <FormField control={form.control} name="quien_lo_trajo" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Quién lo trajo</FormLabel>
+                      <FormControl><Input {...field} placeholder="Nombre del referente" /></FormControl>
+                    </FormItem>
+                  )} />
+                )}
+                <FormField control={form.control} name="comentario" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Comentario</FormLabel>
+                    <FormControl><Input {...field} placeholder="Opcional..." /></FormControl>
                   </FormItem>
                 )} />
               </div>
-            )}
-
-            <div className="space-y-3 rounded-md border p-3 bg-muted/30">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Rol en la lista</p>
-              <FormField control={form.control} name="tipo" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Tipo *</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      {ROL_TIPOS.map(t => (
-                        <SelectItem key={t} value={t}>{ROL_LABELS[t]}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="posicion" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Posición</FormLabel>
-                  <FormControl><Input {...field} placeholder="1, 2, 1er Suplente..." /></FormControl>
-                </FormItem>
-              )} />
-              {tipoWatched === 'Asamblea_Representativa' && (
-                <FormField control={form.control} name="quien_lo_trajo" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Quién lo trajo</FormLabel>
-                    <FormControl><Input {...field} placeholder="Nombre del referente" /></FormControl>
-                  </FormItem>
-                )} />
-              )}
-              <FormField control={form.control} name="comentario" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Comentario</FormLabel>
-                  <FormControl><Input {...field} placeholder="Opcional..." /></FormControl>
-                </FormItem>
-              )} />
-            </div>
-
             </div>
             <DialogFooter className="pt-4">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>

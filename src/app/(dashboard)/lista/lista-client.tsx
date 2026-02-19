@@ -13,7 +13,7 @@ import {
 import { RolFormDialog } from './rol-form'
 import { deleteRolLista } from '@/lib/actions/lista'
 import { ROL_LABELS } from '@/lib/constants/lista'
-import type { RolListaConPersona, RolListaTipo } from '@/types/database'
+import type { Persona, RolListaConPersona, RolListaTipo } from '@/types/database'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
 
 const ROL_TIPOS = Object.keys(ROL_LABELS) as RolListaTipo[]
@@ -27,9 +27,10 @@ const ROL_BADGE_VARIANT: Record<RolListaTipo, 'default' | 'secondary' | 'outline
 
 interface ListaClientProps {
   roles: RolListaConPersona[]
+  personas: Persona[]
 }
 
-export function ListaClient({ roles }: ListaClientProps) {
+export function ListaClient({ roles, personas }: ListaClientProps) {
   const [formOpen, setFormOpen] = useState(false)
   const [editingRol, setEditingRol] = useState<RolListaConPersona | null>(null)
   const [filtroTipo, setFiltroTipo] = useState<RolListaTipo | 'todos'>('todos')
@@ -128,7 +129,7 @@ export function ListaClient({ roles }: ListaClientProps) {
         </Table>
       </div>
 
-      <RolFormDialog open={formOpen} onOpenChange={setFormOpen} rol={editingRol} />
+      <RolFormDialog open={formOpen} onOpenChange={setFormOpen} rol={editingRol} personas={personas} />
     </div>
   )
 }

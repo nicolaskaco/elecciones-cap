@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { PersonaEditForm } from './persona-edit-form'
 import { ROL_LABELS } from '@/lib/constants/lista'
 import type { PersonaConRoles, RolListaTipo } from '@/types/database'
-import { Pencil, Search } from 'lucide-react'
+import { Pencil, Plus, Search } from 'lucide-react'
 
 interface PersonasListaClientProps {
   personas: PersonaConRoles[]
@@ -20,6 +20,8 @@ export function PersonasListaClient({ personas }: PersonasListaClientProps) {
   const [editingPersona, setEditingPersona] = useState<PersonaConRoles | null>(null)
   const [formOpen, setFormOpen] = useState(false)
   const [search, setSearch] = useState('')
+
+  function openCreate() { setEditingPersona(null); setFormOpen(true) }
 
   const filtered = search.trim()
     ? personas.filter(p =>
@@ -35,9 +37,15 @@ export function PersonasListaClient({ personas }: PersonasListaClientProps) {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Personas de la Lista</h1>
-        <p className="text-muted-foreground text-sm">Datos personales de los integrantes de la lista electoral.</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Personas de la Lista</h1>
+          <p className="text-muted-foreground text-sm">Datos personales de los integrantes de la lista electoral.</p>
+        </div>
+        <Button onClick={openCreate}>
+          <Plus className="h-4 w-4 mr-2" />
+          Nueva persona
+        </Button>
       </div>
 
       <div className="flex items-center gap-3">

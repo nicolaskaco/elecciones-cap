@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
-import type { PersonaConRoles, RolListaConPersona, RolListaTipo } from '@/types/database'
+import type { Persona, PersonaConRoles, RolListaConPersona, RolListaTipo } from '@/types/database'
 
 export async function getRolesLista(tipo?: RolListaTipo): Promise<RolListaConPersona[]> {
   await requireAdmin()
@@ -22,13 +22,47 @@ export async function getRolesLista(tipo?: RolListaTipo): Promise<RolListaConPer
   return (data ?? []) as RolListaConPersona[]
 }
 
+export async function createPersona(data: {
+  nombre: string
+  cedula?: string | null
+  nro_socio?: string | null
+  celular?: string | null
+  direccion?: string | null
+  fecha_nacimiento?: string | null
+  email?: string | null
+}): Promise<void> {
+  await requireAdmin()
+  const supabase = await createClient()
+
+  const { error } = await supabase.from('personas').insert({
+    nombre: data.nombre,
+    cedula: data.cedula || null,
+    nro_socio: data.nro_socio || null,
+    celular: data.celular || null,
+    direccion: data.direccion || null,
+    fecha_nacimiento: data.fecha_nacimiento || null,
+    email: data.email || null,
+  })
+
+  if (error) throw new Error(error.message)
+  revalidatePath('/personas-lista')
+}
+
+export async function getPersonasAll(): Promise<Persona[]> {
+  await requireAdmin()
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('personas')
+    .select('*')
+    .order('nombre')
+
+  if (error) throw new Error(error.message)
+  return (data ?? []) as Persona[]
+}
+
 export async function createRolLista(
-  persona: {
-    nombre: string
-    cedula?: string | null
-    nro_socio?: string | null
-    celular?: string | null
-  },
+  persona_id: number,
   rol: {
     tipo: RolListaTipo
     posicion?: string | null
@@ -39,28 +73,15 @@ export async function createRolLista(
   await requireAdmin()
   const supabase = await createClient()
 
-  const { data: personaData, error: personaError } = await supabase
-    .from('personas')
-    .insert({
-      nombre: persona.nombre,
-      cedula: persona.cedula || null,
-      nro_socio: persona.nro_socio || null,
-      celular: persona.celular || null,
-    })
-    .select('id')
-    .single()
-
-  if (personaError) throw new Error(personaError.message)
-
-  const { error: rolError } = await supabase.from('roles_lista').insert({
-    persona_id: personaData.id,
+  const { error } = await supabase.from('roles_lista').insert({
+    persona_id,
     tipo: rol.tipo,
     posicion: rol.posicion || null,
     quien_lo_trajo: rol.quien_lo_trajo || null,
     comentario: rol.comentario || null,
   })
 
-  if (rolError) throw new Error(rolError.message)
+  if (error) throw new Error(error.message)
   revalidatePath('/lista')
 }
 
@@ -122,6 +143,8 @@ export async function updatePersona(
     nro_socio?: string | null
     celular?: string | null
     direccion?: string | null
+    fecha_nacimiento?: string | null
+    email?: string | null
   }
 ): Promise<void> {
   await requireAdmin()
@@ -135,6 +158,8 @@ export async function updatePersona(
       nro_socio: data.nro_socio || null,
       celular: data.celular || null,
       direccion: data.direccion || null,
+      fecha_nacimiento: data.fecha_nacimiento || null,
+      email: data.email || null,
     })
     .eq('id', personaId)
 
