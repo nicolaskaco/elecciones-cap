@@ -277,7 +277,7 @@ export function RolFormDialog({ open, onOpenChange, rol, personas, existingRoles
                     <FormItem>
                       <FormLabel>Posición</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="Titular, 1er Suplente..." />
+                        <Input {...field} placeholder="1, 2, 3..." />
                       </FormControl>
                       {asambleaTaken.length > 0 && (
                         <p className="text-xs text-muted-foreground">
