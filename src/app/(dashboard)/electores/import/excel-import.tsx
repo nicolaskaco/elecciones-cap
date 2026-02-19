@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import { toast } from 'sonner'
 import { Upload, ArrowLeft, Check, AlertCircle } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { Button } from '@/components/ui/button'
@@ -83,7 +84,7 @@ export function ExcelImport() {
       })
 
       if (json.length === 0) {
-        alert('El archivo esta vacio')
+        toast.error('El archivo está vacío')
         return
       }
 
@@ -107,7 +108,7 @@ export function ExcelImport() {
 
   async function handleMapConfirm() {
     if (!mapping.nombre) {
-      alert('Debes mapear al menos el campo Nombre')
+      toast.error('Debes mapear al menos el campo Nombre')
       return
     }
 
@@ -130,7 +131,7 @@ export function ExcelImport() {
       setPreview(prev)
       setStep('preview')
     } catch {
-      alert('Error al generar preview')
+      toast.error('Error al generar preview')
     } finally {
       setLoading(false)
     }
@@ -143,7 +144,7 @@ export function ExcelImport() {
       setResult(res)
       setStep('done')
     } catch {
-      alert('Error al importar')
+      toast.error('Error al importar')
     } finally {
       setLoading(false)
     }

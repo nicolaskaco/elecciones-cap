@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Search, Download, Upload, Plus, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -27,6 +28,7 @@ import { ELECTOR_ESTADOS } from '@/lib/validations/elector'
 import { exportElectoresToCSV } from '@/lib/csv-export'
 import { deleteElector } from '@/lib/actions/electores'
 import { ElectorFormDialog } from './elector-form'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 
 const estadoBadgeVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   Pendiente: 'outline',
@@ -54,6 +56,7 @@ export function ElectoresDataTable({ electores, isAdmin, voluntarios }: Props) {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingElector, setEditingElector] = useState<ElectorConPersona | null>(null)
   const [deleting, setDeleting] = useState<number | null>(null)
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null)
 
   const totalPages = Math.ceil(electores.length / PAGE_SIZE)
   const paged = electores.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
@@ -76,14 +79,16 @@ export function ElectoresDataTable({ electores, isAdmin, voluntarios }: Props) {
     router.push(`/electores?${params.toString()}`)
   }
 
-  async function handleDelete(id: number) {
-    if (!confirm('Estas seguro de eliminar este elector?')) return
+  async function handleDeleteConfirm() {
+    if (pendingDeleteId === null) return
+    const id = pendingDeleteId
+    setPendingDeleteId(null)
     setDeleting(id)
     try {
       await deleteElector(id)
       router.refresh()
     } catch {
-      alert('Error al eliminar elector')
+      toast.error('Error al eliminar elector')
     } finally {
       setDeleting(null)
     }
@@ -222,7 +227,7 @@ export function ElectoresDataTable({ electores, isAdmin, voluntarios }: Props) {
                           disabled={deleting === e.id}
                           onClick={(ev) => {
                             ev.stopPropagation()
-                            handleDelete(e.id)
+                            setPendingDeleteId(e.id)
                           }}
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
@@ -272,6 +277,13 @@ export function ElectoresDataTable({ electores, isAdmin, voluntarios }: Props) {
           voluntarios={voluntarios}
         />
       )}
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        onOpenChange={(open) => { if (!open) setPendingDeleteId(null) }}
+        title="¿Eliminar elector?"
+        description="Esta acción no se puede deshacer. Se eliminará el elector y sus datos asociados."
+        onConfirm={handleDeleteConfirm}
+      />
     </div>
   )
 }

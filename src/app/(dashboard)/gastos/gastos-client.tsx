@@ -15,6 +15,7 @@ import { deleteGasto } from '@/lib/actions/gastos'
 import { RUBRO_LABELS } from '@/lib/constants/gastos'
 import type { Gasto, GastoRubro } from '@/types/database'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 
 const RUBROS = Object.keys(RUBRO_LABELS) as GastoRubro[]
 
@@ -34,6 +35,7 @@ export function GastosClient({ gastos }: GastosClientProps) {
   const [formOpen, setFormOpen] = useState(false)
   const [editingGasto, setEditingGasto] = useState<Gasto | null>(null)
   const [filtroRubro, setFiltroRubro] = useState<GastoRubro | 'todos'>('todos')
+  const [pendingId, setPendingId] = useState<number | null>(null)
   const [, startTransition] = useTransition()
 
   const filtered = filtroRubro === 'todos'
@@ -52,8 +54,10 @@ export function GastosClient({ gastos }: GastosClientProps) {
   function openCreate() { setEditingGasto(null); setFormOpen(true) }
   function openEdit(g: Gasto) { setEditingGasto(g); setFormOpen(true) }
 
-  function handleDelete(id: number) {
-    if (!confirm('¿Eliminar este gasto?')) return
+  function handleDeleteConfirm() {
+    if (pendingId === null) return
+    const id = pendingId
+    setPendingId(null)
     startTransition(async () => {
       try {
         await deleteGasto(id)
@@ -158,7 +162,7 @@ export function GastosClient({ gastos }: GastosClientProps) {
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(g)}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleDelete(g.id)}>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setPendingId(g.id)}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
@@ -171,6 +175,13 @@ export function GastosClient({ gastos }: GastosClientProps) {
       </div>
 
       <GastoFormDialog open={formOpen} onOpenChange={setFormOpen} gasto={editingGasto} />
+      <ConfirmDialog
+        open={pendingId !== null}
+        onOpenChange={(open) => { if (!open) setPendingId(null) }}
+        title="¿Eliminar gasto?"
+        description="Esta acción no se puede deshacer."
+        onConfirm={handleDeleteConfirm}
+      />
     </div>
   )
 }
