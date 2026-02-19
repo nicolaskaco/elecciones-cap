@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import {
   BarChart3,
@@ -58,10 +59,19 @@ export function AppSidebar({ perfil }: AppSidebarProps) {
 
   return (
     <Sidebar>
-      <SidebarHeader className="border-b px-6 py-4">
-        <div>
-          <p className="font-semibold text-sm leading-tight">Elecciones Peñarol</p>
-          <p className="text-xs text-muted-foreground capitalize">{perfil.rol}</p>
+      <SidebarHeader className="border-b px-4 py-3">
+        <div className="flex items-center gap-3">
+          <Image
+            src="/logo.jpeg"
+            alt="Peñarol"
+            width={36}
+            height={36}
+            className="rounded-full shrink-0"
+          />
+          <div>
+            <p className="font-semibold text-sm leading-tight">Elecciones Peñarol</p>
+            <p className="text-xs text-muted-foreground capitalize">{perfil.rol}</p>
+          </div>
         </div>
       </SidebarHeader>
       <SidebarContent>
