@@ -195,3 +195,16 @@ export async function getVoluntarios() {
     .order('nombre')
   return data ?? []
 }
+
+export async function marcarCartasEnviadas(ids: number[]): Promise<void> {
+  await requireAdmin()
+  if (ids.length === 0) return
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('electores')
+    .update({ estado: 'Lista_Enviada' })
+    .in('id', ids)
+  if (error) throw new Error(error.message)
+  revalidatePath('/cartas')
+  revalidatePath('/electores')
+}

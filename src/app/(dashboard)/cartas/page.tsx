@@ -1,8 +1,9 @@
-export default function CartasPage() {
-  return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-bold tracking-tight">Cartas</h1>
-      <p className="text-muted-foreground">Generación de cartas — próximamente en Phase 6.</p>
-    </div>
-  )
+import { requireAdmin } from '@/lib/auth'
+import { getElectores } from '@/lib/actions/electores'
+import { CartasClient } from './cartas-client'
+
+export default async function CartasPage() {
+  await requireAdmin()
+  const electores = await getElectores({ estado: 'Para_Enviar' })
+  return <CartasClient electores={electores} />
 }
