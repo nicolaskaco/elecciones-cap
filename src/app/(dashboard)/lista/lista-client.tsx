@@ -25,6 +25,45 @@ const ROL_BADGE_VARIANT: Record<RolListaTipo, 'default' | 'secondary' | 'outline
   Asamblea_Representativa: 'outline',
 }
 
+const TIPO_ORDER: Record<RolListaTipo, number> = {
+  Dirigente: 0,
+  Comision_Electoral: 1,
+  Comision_Fiscal: 2,
+  Asamblea_Representativa: 3,
+}
+
+const SUFIJO_ORDER: Record<string, number> = {
+  'Titular': 0,
+  '1er Suplente': 1,
+  '2do Suplente': 2,
+}
+
+const STRUCTURED_TIPOS: RolListaTipo[] = ['Dirigente', 'Comision_Electoral', 'Comision_Fiscal']
+
+function parsePosicionSort(posicion: string | null, tipo: RolListaTipo): { num: number; sufijo: number } {
+  if (!posicion) return { num: Infinity, sufijo: Infinity }
+  if (STRUCTURED_TIPOS.includes(tipo)) {
+    const spaceIdx = posicion.indexOf(' ')
+    const num = spaceIdx > -1 ? parseInt(posicion.slice(0, spaceIdx), 10) : parseInt(posicion, 10)
+    const sufijo = spaceIdx > -1 ? posicion.slice(spaceIdx + 1) : ''
+    return { num: isNaN(num) ? Infinity : num, sufijo: SUFIJO_ORDER[sufijo] ?? Infinity }
+  }
+  const num = parseInt(posicion, 10)
+  return { num: isNaN(num) ? Infinity : num, sufijo: 0 }
+}
+
+function sortRoles(roles: RolListaConPersona[]): RolListaConPersona[] {
+  return [...roles].sort((a, b) => {
+    const tipoA = TIPO_ORDER[a.tipo] ?? 99
+    const tipoB = TIPO_ORDER[b.tipo] ?? 99
+    if (tipoA !== tipoB) return tipoA - tipoB
+    const posA = parsePosicionSort(a.posicion, a.tipo)
+    const posB = parsePosicionSort(b.posicion, b.tipo)
+    if (posA.num !== posB.num) return posA.num - posB.num
+    return posA.sufijo - posB.sufijo
+  })
+}
+
 interface ListaClientProps {
   roles: RolListaConPersona[]
   personas: Persona[]
@@ -36,9 +75,9 @@ export function ListaClient({ roles, personas }: ListaClientProps) {
   const [filtroTipo, setFiltroTipo] = useState<RolListaTipo | 'todos'>('todos')
   const [, startTransition] = useTransition()
 
-  const filtered = filtroTipo === 'todos'
-    ? roles
-    : roles.filter(r => r.tipo === filtroTipo)
+  const filtered = sortRoles(
+    filtroTipo === 'todos' ? roles : roles.filter(r => r.tipo === filtroTipo)
+  )
 
   function openCreate() { setEditingRol(null); setFormOpen(true) }
   function openEdit(r: RolListaConPersona) { setEditingRol(r); setFormOpen(true) }
