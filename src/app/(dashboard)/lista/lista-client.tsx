@@ -129,7 +129,7 @@ export function ListaClient({ roles, personas }: ListaClientProps) {
         </Table>
       </div>
 
-      <RolFormDialog open={formOpen} onOpenChange={setFormOpen} rol={editingRol} personas={personas} />
+      <RolFormDialog open={formOpen} onOpenChange={setFormOpen} rol={editingRol} personas={personas} existingRoles={roles} />
     </div>
   )
 }

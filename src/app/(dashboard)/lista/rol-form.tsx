@@ -22,12 +22,34 @@ import type { Persona, RolListaConPersona, RolListaTipo } from '@/types/database
 
 const ROL_TIPOS = Object.keys(ROL_LABELS) as RolListaTipo[]
 
+const DIRIGENTE_NUMEROS = Array.from({ length: 11 }, (_, i) => String(i + 1))
+const DIRIGENTE_SUFIJOS = ['Titular', '1er Suplente', '2do Suplente'] as const
+
+/** Parses a stored posicion like "3 1er Suplente" → { numero: "3", sufijo: "1er Suplente" } */
+function parsePosicion(posicion: string | null): { numero: string; sufijo: string } {
+  if (!posicion) return { numero: '', sufijo: '' }
+  const spaceIdx = posicion.indexOf(' ')
+  if (spaceIdx === -1) return { numero: posicion, sufijo: '' }
+  return { numero: posicion.substring(0, spaceIdx), sufijo: posicion.substring(spaceIdx + 1) }
+}
+
 const schema = z.object({
   persona_id: z.string().min(1, 'Seleccioná una persona'),
   tipo: z.enum(['Dirigente', 'Comision_Electoral', 'Comision_Fiscal', 'Asamblea_Representativa'] as const),
+  posicion_numero: z.string().optional(),
+  posicion_sufijo: z.string().optional(),
   posicion: z.string().optional(),
   quien_lo_trajo: z.string().optional(),
   comentario: z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (data.tipo === 'Dirigente') {
+    if (!data.posicion_numero) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Seleccioná un número', path: ['posicion_numero'] })
+    }
+    if (!data.posicion_sufijo) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Seleccioná una categoría', path: ['posicion_sufijo'] })
+    }
+  }
 })
 
 type FormValues = z.infer<typeof schema>
@@ -37,45 +59,81 @@ interface RolFormDialogProps {
   onOpenChange: (open: boolean) => void
   rol?: RolListaConPersona | null
   personas: Persona[]
+  existingRoles: RolListaConPersona[]
 }
 
-export function RolFormDialog({ open, onOpenChange, rol, personas }: RolFormDialogProps) {
+export function RolFormDialog({ open, onOpenChange, rol, personas, existingRoles }: RolFormDialogProps) {
   const [loading, setLoading] = useState(false)
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      persona_id: '', tipo: 'Dirigente', posicion: '', quien_lo_trajo: '', comentario: '',
+      persona_id: '', tipo: 'Dirigente',
+      posicion_numero: '', posicion_sufijo: '',
+      posicion: '', quien_lo_trajo: '', comentario: '',
     },
   })
 
   const tipoWatched = form.watch('tipo')
+  const numeroWatched = form.watch('posicion_numero')
+
+  // Positions already taken by other Dirigentes (excluding the one being edited)
+  const takenPositions = new Set(
+    existingRoles
+      .filter(r => r.tipo === 'Dirigente' && r.posicion && r.id !== rol?.id)
+      .map(r => r.posicion!)
+  )
+
+  // Which sufijos are taken for the currently selected número
+  function isTaken(numero: string, sufijo: string) {
+    return takenPositions.has(`${numero} ${sufijo}`)
+  }
 
   useEffect(() => {
     if (open) {
       if (rol) {
+        const { numero, sufijo } = parsePosicion(rol.posicion)
         form.reset({
           persona_id: rol.persona_id.toString(),
           tipo: rol.tipo,
+          posicion_numero: numero,
+          posicion_sufijo: sufijo,
           posicion: rol.posicion ?? '',
           quien_lo_trajo: rol.quien_lo_trajo ?? '',
           comentario: rol.comentario ?? '',
         })
       } else {
         form.reset({
-          persona_id: '', tipo: 'Dirigente', posicion: '', quien_lo_trajo: '', comentario: '',
+          persona_id: '', tipo: 'Dirigente',
+          posicion_numero: '', posicion_sufijo: '',
+          posicion: '', quien_lo_trajo: '', comentario: '',
         })
       }
     }
   }, [open, rol, form])
 
+  // Reset sufijo when número changes so a stale taken value doesn't slip through
+  useEffect(() => {
+    if (tipoWatched === 'Dirigente') {
+      const sufijo = form.getValues('posicion_sufijo')
+      if (sufijo && isTaken(numeroWatched ?? '', sufijo)) {
+        form.setValue('posicion_sufijo', '')
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [numeroWatched])
+
   async function onSubmit(values: FormValues) {
+    const posicion = values.tipo === 'Dirigente'
+      ? `${values.posicion_numero} ${values.posicion_sufijo}`
+      : values.posicion || null
+
     setLoading(true)
     try {
       if (rol) {
         await updateRolLista(rol.id, {
           tipo: values.tipo,
-          posicion: values.posicion || null,
+          posicion,
           quien_lo_trajo: values.quien_lo_trajo || null,
           comentario: values.comentario || null,
         })
@@ -83,7 +141,7 @@ export function RolFormDialog({ open, onOpenChange, rol, personas }: RolFormDial
       } else {
         await createRolLista(parseInt(values.persona_id), {
           tipo: values.tipo,
-          posicion: values.posicion || null,
+          posicion,
           quien_lo_trajo: values.quien_lo_trajo || null,
           comentario: values.comentario || null,
         })
@@ -138,6 +196,7 @@ export function RolFormDialog({ open, onOpenChange, rol, personas }: RolFormDial
 
               <div className="space-y-3 rounded-md border p-3 bg-muted/30">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Rol en la lista</p>
+
                 <FormField control={form.control} name="tipo" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Tipo *</FormLabel>
@@ -152,12 +211,56 @@ export function RolFormDialog({ open, onOpenChange, rol, personas }: RolFormDial
                     <FormMessage />
                   </FormItem>
                 )} />
-                <FormField control={form.control} name="posicion" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Posición</FormLabel>
-                    <FormControl><Input {...field} placeholder="1, 2, 1er Suplente..." /></FormControl>
-                  </FormItem>
-                )} />
+
+                {tipoWatched === 'Dirigente' ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    <FormField control={form.control} name="posicion_numero" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Número *</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl><SelectTrigger><SelectValue placeholder="1 – 11" /></SelectTrigger></FormControl>
+                          <SelectContent>
+                            {DIRIGENTE_NUMEROS.map(n => (
+                              <SelectItem key={n} value={n}>{n}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={form.control} name="posicion_sufijo" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Categoría *</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                          disabled={!numeroWatched}
+                        >
+                          <FormControl><SelectTrigger><SelectValue placeholder="Categoría" /></SelectTrigger></FormControl>
+                          <SelectContent>
+                            {DIRIGENTE_SUFIJOS.map(s => {
+                              const taken = isTaken(numeroWatched ?? '', s)
+                              return (
+                                <SelectItem key={s} value={s} disabled={taken}>
+                                  {s}{taken ? ' (ocupado)' : ''}
+                                </SelectItem>
+                              )
+                            })}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </div>
+                ) : (
+                  <FormField control={form.control} name="posicion" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Posición</FormLabel>
+                      <FormControl><Input {...field} placeholder="Titular, Suplente, 1er Suplente..." /></FormControl>
+                    </FormItem>
+                  )} />
+                )}
+
                 {tipoWatched === 'Asamblea_Representativa' && (
                   <FormField control={form.control} name="quien_lo_trajo" render={({ field }) => (
                     <FormItem>
@@ -166,6 +269,7 @@ export function RolFormDialog({ open, onOpenChange, rol, personas }: RolFormDial
                     </FormItem>
                   )} />
                 )}
+
                 <FormField control={form.control} name="comentario" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Comentario</FormLabel>
