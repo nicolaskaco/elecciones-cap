@@ -11,10 +11,25 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { RolFormDialog } from './rol-form'
+import { ImportListaDialog } from './import-lista-dialog'
+import { ExportDialog, type ExportField } from '@/components/export-dialog'
 import { deleteRolLista } from '@/lib/actions/lista'
 import { ROL_LABELS } from '@/lib/constants/lista'
 import type { Persona, RolListaConPersona, RolListaTipo } from '@/types/database'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
+
+const EXPORT_FIELDS: ExportField<RolListaConPersona>[] = [
+  { key: 'nombre',          label: 'Nombre',       defaultChecked: true,  getValue: r => r.personas.nombre },
+  { key: 'cedula',          label: 'Cédula',       defaultChecked: true,  getValue: r => r.personas.cedula },
+  { key: 'nro_socio',       label: 'Nro de Socio', defaultChecked: true,  getValue: r => r.personas.nro_socio },
+  { key: 'celular',         label: 'Celular',      defaultChecked: true,  getValue: r => r.personas.celular },
+  { key: 'telefono',        label: 'Teléfono',     defaultChecked: false, getValue: r => r.personas.telefono },
+  { key: 'email',           label: 'Email',        defaultChecked: false, getValue: r => r.personas.email },
+  { key: 'tipo',            label: 'Rol',          defaultChecked: false, getValue: r => ROL_LABELS[r.tipo] },
+  { key: 'posicion',        label: 'Posición',     defaultChecked: false, getValue: r => r.posicion },
+  { key: 'quien_lo_trajo',  label: 'Quién lo trajo', defaultChecked: false, getValue: r => r.quien_lo_trajo },
+  { key: 'comentario',      label: 'Comentario',   defaultChecked: false, getValue: r => r.comentario },
+]
 
 const ROL_TIPOS = Object.keys(ROL_LABELS) as RolListaTipo[]
 
@@ -107,7 +122,7 @@ export function ListaClient({ roles, personas }: ListaClientProps) {
         </Button>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <Select value={filtroTipo} onValueChange={(v) => setFiltroTipo(v as RolListaTipo | 'todos')}>
           <SelectTrigger className="w-56">
             <SelectValue />
@@ -120,6 +135,14 @@ export function ListaClient({ roles, personas }: ListaClientProps) {
           </SelectContent>
         </Select>
         <span className="text-sm text-muted-foreground">{filtered.length} integrante{filtered.length !== 1 ? 's' : ''}</span>
+        <div className="ml-auto flex gap-2">
+          <ImportListaDialog />
+          <ExportDialog
+            data={filtered}
+            fields={EXPORT_FIELDS}
+            filename={`lista${filtroTipo !== 'todos' ? `-${filtroTipo.toLowerCase()}` : ''}`}
+          />
+        </div>
       </div>
 
       <div className="rounded-md border">

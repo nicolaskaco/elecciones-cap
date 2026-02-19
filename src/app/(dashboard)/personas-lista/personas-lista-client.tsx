@@ -8,9 +8,23 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { PersonaEditForm } from './persona-edit-form'
+import { ImportPersonasDialog } from './import-personas-dialog'
+import { ExportDialog, type ExportField } from '@/components/export-dialog'
 import { ROL_LABELS } from '@/lib/constants/lista'
 import type { PersonaConRoles, RolListaTipo } from '@/types/database'
 import { Pencil, Plus, Search } from 'lucide-react'
+
+const EXPORT_FIELDS: ExportField<PersonaConRoles>[] = [
+  { key: 'nombre',           label: 'Nombre',             defaultChecked: true,  getValue: p => p.nombre },
+  { key: 'cedula',           label: 'Cédula',             defaultChecked: true,  getValue: p => p.cedula },
+  { key: 'nro_socio',        label: 'Nro de Socio',       defaultChecked: true,  getValue: p => p.nro_socio },
+  { key: 'celular',          label: 'Celular',            defaultChecked: true,  getValue: p => p.celular },
+  { key: 'telefono',         label: 'Teléfono',           defaultChecked: false, getValue: p => p.telefono },
+  { key: 'email',            label: 'Email',              defaultChecked: false, getValue: p => p.email },
+  { key: 'fecha_nacimiento', label: 'Fecha de Nacimiento',defaultChecked: false, getValue: p => p.fecha_nacimiento },
+  { key: 'direccion',        label: 'Dirección',          defaultChecked: false, getValue: p => p.direccion },
+  { key: 'roles',            label: 'Roles',              defaultChecked: false, getValue: p => p.roles_lista.map(r => ROL_LABELS[r.tipo as RolListaTipo]).join(', ') },
+]
 
 interface PersonasListaClientProps {
   personas: PersonaConRoles[]
@@ -48,7 +62,7 @@ export function PersonasListaClient({ personas }: PersonasListaClientProps) {
         </Button>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <div className="relative w-64">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
@@ -59,6 +73,14 @@ export function PersonasListaClient({ personas }: PersonasListaClientProps) {
           />
         </div>
         <span className="text-sm text-muted-foreground">{filtered.length} persona{filtered.length !== 1 ? 's' : ''}</span>
+        <div className="ml-auto flex gap-2">
+          <ImportPersonasDialog />
+          <ExportDialog
+            data={filtered}
+            fields={EXPORT_FIELDS}
+            filename="personas-lista"
+          />
+        </div>
       </div>
 
       <div className="rounded-md border">
