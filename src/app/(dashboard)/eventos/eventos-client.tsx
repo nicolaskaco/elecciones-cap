@@ -34,14 +34,6 @@ function getEventDateTime(fecha: string, hora: string | null): Date {
   return base
 }
 
-function getEventoStatus(fecha: string, hora: string | null): 'upcoming' | 'today' | 'past' {
-  const now = new Date()
-  const today = now.toISOString().split('T')[0]
-  const eventDt = getEventDateTime(fecha, hora)
-  if (eventDt <= now) return 'past'
-  if (fecha === today) return 'today'
-  return 'upcoming'
-}
 
 interface EventosClientProps {
   eventos: Evento[]
@@ -72,7 +64,6 @@ export function EventosClient({ eventos }: EventosClientProps) {
   }
 
   function EventoRow({ e }: { e: Evento }) {
-    const status = getEventoStatus(e.fecha, e.hora)
     return (
       <TableRow key={e.id}>
         <TableCell className="whitespace-nowrap">
