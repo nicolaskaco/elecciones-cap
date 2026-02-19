@@ -51,7 +51,13 @@ export function ExportDialog<T>({ data, fields, filename, disabled }: ExportDial
     const ws = XLSX.utils.json_to_sheet(rows)
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Datos')
-    XLSX.writeFile(wb, `${filename}.xlsx`)
+    const now = new Date()
+    const ts = now.getFullYear().toString()
+      + '-' + String(now.getMonth() + 1).padStart(2, '0')
+      + '-' + String(now.getDate()).padStart(2, '0')
+      + '_' + String(now.getHours()).padStart(2, '0')
+      + '-' + String(now.getMinutes()).padStart(2, '0')
+    XLSX.writeFile(wb, `${filename}_${ts}.xlsx`)
     setOpen(false)
   }
 
