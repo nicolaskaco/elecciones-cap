@@ -139,7 +139,7 @@ export function ElectoresDataTable({ electores, isAdmin, voluntarios }: Props) {
       try {
         await asignarElectoresEnMasa(
           Array.from(selected),
-          assignVoluntarioId === '' ? null : assignVoluntarioId
+          assignVoluntarioId === '__none__' ? null : assignVoluntarioId || null
         )
         toast.success(`${selected.size} elector${selected.size !== 1 ? 'es' : ''} asignado${selected.size !== 1 ? 's' : ''}`)
         setSelected(new Set())
@@ -224,7 +224,7 @@ export function ElectoresDataTable({ electores, isAdmin, voluntarios }: Props) {
               <SelectValue placeholder="Elegir voluntario" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Sin asignar</SelectItem>
+              <SelectItem value="__none__">Sin asignar</SelectItem>
               {voluntarios.map((v) => (
                 <SelectItem key={v.id} value={v.id}>
                   {v.nombre}
