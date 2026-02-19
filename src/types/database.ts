@@ -154,3 +154,16 @@ export interface Evento {
   direccion: string | null
   created_at: string
 }
+
+// ============================================================
+// COMPOSITE TYPES
+// ============================================================
+
+export interface PreguntaConReglas extends PreguntaFlow {
+  reglas_flow: ReglaFlow[]
+}
+
+export interface LlamadaConDetalles extends Llamada {
+  electores: { personas: { nombre: string } }
+  perfiles: { nombre: string }
+}
