@@ -11,8 +11,10 @@ import type { Llamada } from '@/types/database'
 const estadoBadgeVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   Pendiente: 'outline',
   Llamado: 'secondary',
-  Acepto: 'default',
-  Sobre_Enviado: 'secondary',
+  Confirmado: 'default',
+  Para_Enviar: 'secondary',
+  Lista_Enviada: 'secondary',
+  Numero_Incorrecto: 'outline',
   Descartado: 'destructive',
 }
 

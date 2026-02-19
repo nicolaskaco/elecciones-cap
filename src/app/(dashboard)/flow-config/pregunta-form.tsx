@@ -32,8 +32,11 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { createPregunta, updatePregunta } from '@/lib/actions/flow-config'
-import type { PreguntaFlow, PreguntaTipo } from '@/types/database'
+import type { LlamadaResultado, PreguntaFlow, PreguntaTipo } from '@/types/database'
+import { RESULTADO_LABELS } from '@/lib/validations/llamada'
 import { X, Plus } from 'lucide-react'
+
+const RESULTADO_OPTIONS = Object.entries(RESULTADO_LABELS) as [LlamadaResultado, string][]
 
 const schema = z.object({
   texto: z.string().min(1, 'El texto es requerido'),
@@ -41,6 +44,8 @@ const schema = z.object({
   orden_default: z.string().optional(),
   activa: z.boolean(),
   accion_enviar_lista: z.boolean(),
+  resultado_si: z.string().nullable().optional(),
+  resultado_no: z.string().nullable().optional(),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -64,6 +69,8 @@ export function PreguntaFormDialog({ open, onOpenChange, pregunta }: PreguntaFor
       orden_default: '',
       activa: true,
       accion_enviar_lista: false,
+      resultado_si: null,
+      resultado_no: null,
     },
   })
 
@@ -79,10 +86,20 @@ export function PreguntaFormDialog({ open, onOpenChange, pregunta }: PreguntaFor
           orden_default: pregunta.orden_default?.toString() ?? '',
           activa: pregunta.activa,
           accion_enviar_lista: pregunta.accion === 'enviar_lista',
+          resultado_si: pregunta.resultado_si ?? null,
+          resultado_no: pregunta.resultado_no ?? null,
         })
         setOpciones(pregunta.opciones ?? [])
       } else {
-        form.reset({ texto: '', tipo: 'boolean', orden_default: '', activa: true, accion_enviar_lista: false })
+        form.reset({
+          texto: '',
+          tipo: 'boolean',
+          orden_default: '',
+          activa: true,
+          accion_enviar_lista: false,
+          resultado_si: null,
+          resultado_no: null,
+        })
         setOpciones([])
       }
       setNewOpcion('')
@@ -99,6 +116,8 @@ export function PreguntaFormDialog({ open, onOpenChange, pregunta }: PreguntaFor
         activa: values.activa,
         opciones: values.tipo === 'select' ? opciones : null,
         accion: values.accion_enviar_lista ? 'enviar_lista' : null,
+        resultado_si: values.tipo === 'boolean' ? (values.resultado_si ?? null) : null,
+        resultado_no: values.tipo === 'boolean' ? (values.resultado_no ?? null) : null,
       }
 
       if (pregunta) {
@@ -142,7 +161,7 @@ export function PreguntaFormDialog({ open, onOpenChange, pregunta }: PreguntaFor
                 <FormItem>
                   <FormLabel>Texto</FormLabel>
                   <FormControl>
-                    <Input {...field} placeholder="¿Te gustaría votar por...?" />
+                    <Input {...field} placeholder="¿Votarías a Martín Arroyo como Presidente?" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -170,6 +189,7 @@ export function PreguntaFormDialog({ open, onOpenChange, pregunta }: PreguntaFor
                 </FormItem>
               )}
             />
+
             {tipoWatched === 'select' && (
               <div className="space-y-2">
                 <Label>Opciones</Label>
@@ -207,6 +227,67 @@ export function PreguntaFormDialog({ open, onOpenChange, pregunta }: PreguntaFor
                 </div>
               </div>
             )}
+
+            {tipoWatched === 'boolean' && (
+              <div className="rounded-md border p-3 space-y-3 bg-muted/30">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Resultado automático
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField
+                    control={form.control}
+                    name="resultado_si"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Si responde Sí</FormLabel>
+                        <Select
+                          onValueChange={(v) => field.onChange(v === 'none' ? null : v)}
+                          value={field.value ?? 'none'}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue placeholder="Sin mapeo" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">Sin mapeo</SelectItem>
+                            {RESULTADO_OPTIONS.map(([val, label]) => (
+                              <SelectItem key={val} value={val}>{label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="resultado_no"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Si responde No</FormLabel>
+                        <Select
+                          onValueChange={(v) => field.onChange(v === 'none' ? null : v)}
+                          value={field.value ?? 'none'}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue placeholder="Sin mapeo" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">Sin mapeo</SelectItem>
+                            {RESULTADO_OPTIONS.map(([val, label]) => (
+                              <SelectItem key={val} value={val}>{label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+            )}
+
             <FormField
               control={form.control}
               name="orden_default"

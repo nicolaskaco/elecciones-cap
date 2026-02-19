@@ -134,16 +134,18 @@ export async function submitLlamada(input: SubmitLlamadaInput): Promise<{ llamad
     if (respuestasError) throw new Error(respuestasError.message)
   }
 
-  // Update elector estado — if enviar_lista was confirmed during the call, use Para_Enviar
+  // Update elector estado
+  // For Nos_Vota: use Para_Enviar if they confirmed lista delivery, otherwise Confirmado
   const { data: electorActual } = await supabase
     .from('electores')
     .select('enviar_lista')
     .eq('id', input.elector_id)
     .single()
 
-  const nuevoEstado = electorActual?.enviar_lista
-    ? 'Para_Enviar'
-    : RESULTADO_TO_ESTADO[input.resultado]
+  const nuevoEstado =
+    input.resultado === 'Nos_Vota' && electorActual?.enviar_lista
+      ? 'Para_Enviar'
+      : RESULTADO_TO_ESTADO[input.resultado]
 
   const { error: updateError } = await supabase
     .from('electores')

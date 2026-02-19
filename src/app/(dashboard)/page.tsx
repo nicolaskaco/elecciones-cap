@@ -12,7 +12,7 @@ async function getKPIs() {
     supabase
       .from('electores')
       .select('id', { count: 'exact', head: true })
-      .eq('estado', 'Acepto'),
+      .eq('estado', 'Confirmado'),
   ])
 
   const totalElectores = electoresRes.count ?? 0

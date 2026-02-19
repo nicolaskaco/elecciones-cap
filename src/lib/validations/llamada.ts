@@ -2,10 +2,10 @@ import { z } from 'zod'
 import type { ElectorEstado, LlamadaResultado } from '@/types/database'
 
 export const RESULTADO_TO_ESTADO: Record<LlamadaResultado, ElectorEstado> = {
-  Nos_Vota: 'Acepto',
+  Nos_Vota: 'Confirmado',
   No_Nos_Vota: 'Descartado',
   No_Atendio: 'Llamado',
-  Numero_Incorrecto: 'Llamado',
+  Numero_Incorrecto: 'Numero_Incorrecto',
 }
 
 export const RESULTADO_LABELS: Record<LlamadaResultado, string> = {

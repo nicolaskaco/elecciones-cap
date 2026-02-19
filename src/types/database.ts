@@ -3,7 +3,7 @@
 // ============================================================
 
 export type UserRol = 'Admin' | 'Voluntario'
-export type ElectorEstado = 'Pendiente' | 'Llamado' | 'Acepto' | 'Para_Enviar' | 'Sobre_Enviado' | 'Descartado'
+export type ElectorEstado = 'Pendiente' | 'Llamado' | 'Confirmado' | 'Para_Enviar' | 'Lista_Enviada' | 'Numero_Incorrecto' | 'Descartado'
 export type RolListaTipo =
   | 'Dirigente'
   | 'Comision_Electoral'
@@ -98,6 +98,8 @@ export interface PreguntaFlow {
   opciones: string[] | null
   activa: boolean
   accion: string | null
+  resultado_si: LlamadaResultado | null
+  resultado_no: LlamadaResultado | null
   created_at: string
 }
 
