@@ -3,29 +3,32 @@
 // ============================================================
 
 export type UserRol = 'Admin' | 'Voluntario'
-export type ElectorEstado = 'Sin_contactar' | 'No_contesta' | 'Rechazado' | 'Dudoso' | 'Aceptado'
+export type ElectorEstado = 'Pendiente' | 'Llamado' | 'Acepto' | 'Sobre_Enviado' | 'Descartado'
 export type RolListaTipo =
-  | 'Candidato_Principal'
-  | 'Candidato_Suplente'
-  | 'Delegado_Principal'
-  | 'Delegado_Suplente'
+  | 'Dirigente'
+  | 'Comision_Electoral'
+  | 'Comision_Fiscal'
+  | 'Asamblea_Representativa'
 export type ComisionTipo =
-  | 'Deportiva'
-  | 'Cultural'
+  | 'Futbol'
+  | 'Formativas'
+  | 'Basketball'
+  | 'Deportes_Anexos'
   | 'Social'
-  | 'Finanzas'
   | 'Infraestructura'
-  | 'Otra'
-export type PreguntaTipo = 'libre' | 'opcion_multiple' | 'si_no' | 'escala'
-export type LlamadaResultado = 'no_contesta' | 'rechazado' | 'dudoso' | 'aceptado' | 'callback'
-export type CampanaEstado = 'borrador' | 'programada' | 'enviada' | 'cancelada'
+  | 'AUFI'
+export type PreguntaTipo = 'text' | 'select' | 'boolean'
+export type LlamadaResultado = 'No_Atendio' | 'Numero_Incorrecto' | 'Nos_Vota' | 'No_Nos_Vota'
+export type CampanaEstado = 'Borrador' | 'Enviando' | 'Enviada'
 export type GastoRubro =
-  | 'Impresion'
-  | 'Transporte'
-  | 'Alimentacion'
-  | 'Publicidad'
-  | 'Tecnologia'
-  | 'Otro'
+  | 'Publicidad_Radio'
+  | 'TV'
+  | 'Redes'
+  | 'Comida'
+  | 'Evento'
+  | 'Sonido'
+  | 'Community_Manager'
+  | 'Disenador_Grafico'
 
 // ============================================================
 // ROW TYPES
@@ -43,14 +46,14 @@ export interface Perfil {
 
 export interface Persona {
   id: number
-  ci: string | null
+  cedula: string | null
   nombre: string
-  apellido: string
+  nro_socio: string | null
   fecha_nacimiento: string | null
   telefono: string | null
+  celular: string | null
   email: string | null
   direccion: string | null
-  barrio: string | null
   created_at: string
   updated_at: string
 }
@@ -73,21 +76,22 @@ export interface RolLista {
   id: number
   persona_id: number
   tipo: RolListaTipo
-  orden: number | null
-  bio: string | null
-  foto_url: string | null
+  posicion: string | null
+  quien_lo_trajo: string | null
+  comentario: string | null
   created_at: string
 }
 
 export interface ComisionInteres {
   id: number
-  elector_id: number
+  persona_id: number
   comision: ComisionTipo
+  created_at: string
 }
 
 export interface PreguntaFlow {
   id: number
-  orden: number
+  orden_default: number | null
   texto: string
   tipo: PreguntaTipo
   opciones: string[] | null
@@ -97,9 +101,9 @@ export interface PreguntaFlow {
 
 export interface ReglaFlow {
   id: number
-  pregunta_id: number
-  condicion_valor: string
-  accion: string
+  pregunta_origen_id: number
+  respuesta_valor: string | null
+  pregunta_destino_id: number | null
   created_at: string
 }
 
@@ -108,9 +112,7 @@ export interface Llamada {
   elector_id: number
   voluntario_id: string
   resultado: LlamadaResultado
-  duracion_seg: number | null
-  notas: string | null
-  callback_at: string | null
+  fecha: string
   created_at: string
 }
 
@@ -125,32 +127,30 @@ export interface RespuestaFlow {
 export interface CampanaEmail {
   id: number
   asunto: string
-  html_body: string
+  template_html: string
   estado: CampanaEstado
-  programada_at: string | null
-  enviada_at: string | null
-  creada_por: string
+  nombre: string | null
+  segmento: string | null
+  enviados: number
   created_at: string
 }
 
 export interface Gasto {
   id: number
   rubro: GastoRubro
-  descripcion: string
   monto: number
   fecha: string
-  comprobante_url: string | null
-  registrado_por: string
+  concepto: string | null
+  programa_campana: string | null
+  quien_pago: string | null
   created_at: string
 }
 
 export interface Evento {
   id: number
-  titulo: string
+  nombre: string
   descripcion: string | null
-  inicio: string
-  fin: string | null
-  lugar: string | null
-  creado_por: string
+  fecha: string
+  direccion: string | null
   created_at: string
 }

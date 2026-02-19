@@ -30,6 +30,7 @@ import type { Perfil } from '@/types/database'
 
 const voluntarioNav = [
   { href: '/', label: 'Dashboard', icon: BarChart3 },
+  { href: '/electores', label: 'Mis Electores', icon: Users },
   { href: '/llamadas', label: 'Llamadas', icon: Phone },
 ]
 
