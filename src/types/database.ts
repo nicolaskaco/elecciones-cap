@@ -179,3 +179,7 @@ export interface RolListaConPersona extends RolLista {
 export interface ComisionConPersona extends ComisionInteres {
   personas: Persona
 }
+
+export interface PersonaConRoles extends Persona {
+  roles_lista: RolLista[]
+}
