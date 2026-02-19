@@ -24,6 +24,7 @@ import { Textarea } from '@/components/ui/textarea'
 import type { ElectorConPersona } from '@/types/database'
 import { ELECTOR_ESTADOS } from '@/lib/validations/elector'
 import { createElector, updateElector } from '@/lib/actions/electores'
+import { toast } from 'sonner'
 
 interface Props {
   open: boolean
@@ -110,7 +111,7 @@ export function ElectorFormDialog({ open, onOpenChange, elector, voluntarios }: 
       reset()
       router.refresh()
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Error al guardar')
+      toast.error(err instanceof Error ? err.message : 'Error al guardar')
     } finally {
       setSaving(false)
     }

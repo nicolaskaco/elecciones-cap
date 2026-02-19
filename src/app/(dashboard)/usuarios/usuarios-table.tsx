@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { toast } from 'sonner'
 import {
   Table,
   TableBody,
@@ -44,7 +45,7 @@ export function UsuariosTable({ usuarios, currentUserId }: Props) {
       await updateUsuarioRol(userId, rol)
       router.refresh()
     } catch {
-      alert('Error al actualizar rol')
+      toast.error('Error al actualizar rol')
     } finally {
       setUpdating(null)
     }

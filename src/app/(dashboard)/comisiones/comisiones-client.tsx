@@ -15,6 +15,7 @@ import { deleteComisionInteres } from '@/lib/actions/comisiones'
 import { COMISION_LABELS } from '@/lib/constants/comisiones'
 import type { ComisionConPersona, ComisionTipo, Persona } from '@/types/database'
 import { Plus, Trash2 } from 'lucide-react'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 
 const COMISION_TIPOS = Object.keys(COMISION_LABELS) as ComisionTipo[]
 
@@ -26,6 +27,7 @@ interface ComisionesClientProps {
 export function ComisionesClient({ comisiones, personas }: ComisionesClientProps) {
   const [formOpen, setFormOpen] = useState(false)
   const [filtro, setFiltro] = useState<ComisionTipo | 'todas'>('todas')
+  const [pendingId, setPendingId] = useState<number | null>(null)
   const [, startTransition] = useTransition()
 
   const filtered = filtro === 'todas'
@@ -38,8 +40,10 @@ export function ComisionesClient({ comisiones, personas }: ComisionesClientProps
     return acc
   }, {} as Record<ComisionTipo, number>)
 
-  function handleDelete(id: number) {
-    if (!confirm('¿Eliminar este interés?')) return
+  function handleDeleteConfirm() {
+    if (pendingId === null) return
+    const id = pendingId
+    setPendingId(null)
     startTransition(async () => {
       try {
         await deleteComisionInteres(id)
@@ -131,7 +135,7 @@ export function ComisionesClient({ comisiones, personas }: ComisionesClientProps
                     <div className="flex justify-end">
                       <Button
                         variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => handleDelete(c.id)}
+                        onClick={() => setPendingId(c.id)}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
@@ -145,6 +149,13 @@ export function ComisionesClient({ comisiones, personas }: ComisionesClientProps
       </div>
 
       <ComisionFormDialog open={formOpen} onOpenChange={setFormOpen} personas={personas} />
+      <ConfirmDialog
+        open={pendingId !== null}
+        onOpenChange={(open) => { if (!open) setPendingId(null) }}
+        title="¿Eliminar interés?"
+        description="Esta acción no se puede deshacer."
+        onConfirm={handleDeleteConfirm}
+      />
     </div>
   )
 }

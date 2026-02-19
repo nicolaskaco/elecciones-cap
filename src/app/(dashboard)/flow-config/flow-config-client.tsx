@@ -18,6 +18,7 @@ import { ReglasEditor } from './reglas-editor'
 import { togglePreguntaActiva, deletePregunta } from '@/lib/actions/flow-config'
 import type { PreguntaConReglas } from '@/types/database'
 import { Plus, Pencil, GitBranch, Trash2 } from 'lucide-react'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 
 const TIPO_LABELS: Record<string, string> = {
   boolean: 'Sí / No',
@@ -34,6 +35,7 @@ export function FlowConfigClient({ preguntas }: FlowConfigClientProps) {
   const [editingPregunta, setEditingPregunta] = useState<PreguntaConReglas | null>(null)
   const [reglasOpen, setReglasOpen] = useState(false)
   const [reglasTarget, setReglasTarget] = useState<PreguntaConReglas | null>(null)
+  const [pendingId, setPendingId] = useState<number | null>(null)
   const [, startTransition] = useTransition()
 
   function openCreate() {
@@ -61,8 +63,10 @@ export function FlowConfigClient({ preguntas }: FlowConfigClientProps) {
     })
   }
 
-  function handleDelete(id: number) {
-    if (!confirm('¿Eliminar esta pregunta y sus reglas?')) return
+  function handleDeleteConfirm() {
+    if (pendingId === null) return
+    const id = pendingId
+    setPendingId(null)
     startTransition(async () => {
       try {
         await deletePregunta(id)
@@ -150,7 +154,7 @@ export function FlowConfigClient({ preguntas }: FlowConfigClientProps) {
                         size="icon"
                         className="h-8 w-8 text-destructive hover:text-destructive"
                         title="Eliminar"
-                        onClick={() => handleDelete(p.id)}
+                        onClick={() => setPendingId(p.id)}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
@@ -173,6 +177,13 @@ export function FlowConfigClient({ preguntas }: FlowConfigClientProps) {
         onOpenChange={setReglasOpen}
         pregunta={reglasTarget}
         allPreguntas={preguntas}
+      />
+      <ConfirmDialog
+        open={pendingId !== null}
+        onOpenChange={(open) => { if (!open) setPendingId(null) }}
+        title="¿Eliminar pregunta?"
+        description="Se eliminarán también todas sus reglas de branching. Esta acción no se puede deshacer."
+        onConfirm={handleDeleteConfirm}
       />
     </div>
   )
