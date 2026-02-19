@@ -102,6 +102,10 @@ export function FlowEngine({ elector, preguntas, reglas }: FlowEngineProps) {
       if (!currentPreguntaId) return
       const pregunta = preguntas.find((p) => p.id === currentPreguntaId)
 
+      // Pre-fill resultado if this question maps to one
+      if (pregunta?.resultado_si && valor === 'Si') setResultado(pregunta.resultado_si as LlamadaResultado)
+      else if (pregunta?.resultado_no && valor === 'No') setResultado(pregunta.resultado_no as LlamadaResultado)
+
       // Intercept enviar_lista action on 'Si'
       if (pregunta?.accion === 'enviar_lista' && valor === 'Si') {
         setPendingAnswer({ preguntaId: currentPreguntaId, valor })

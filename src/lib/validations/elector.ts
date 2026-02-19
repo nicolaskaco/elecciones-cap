@@ -3,8 +3,10 @@ import { z } from 'zod'
 export const ELECTOR_ESTADOS = [
   'Pendiente',
   'Llamado',
-  'Acepto',
-  'Sobre_Enviado',
+  'Confirmado',
+  'Para_Enviar',
+  'Lista_Enviada',
+  'Numero_Incorrecto',
   'Descartado',
 ] as const
 

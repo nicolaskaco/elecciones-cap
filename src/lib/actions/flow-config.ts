@@ -26,6 +26,8 @@ export async function createPregunta(data: {
   activa: boolean
   opciones?: string[] | null
   accion?: string | null
+  resultado_si?: string | null
+  resultado_no?: string | null
 }): Promise<void> {
   await requireAdmin()
   const supabase = await createClient()
@@ -37,6 +39,8 @@ export async function createPregunta(data: {
     activa: data.activa,
     opciones: data.opciones ?? null,
     accion: data.accion ?? null,
+    resultado_si: data.resultado_si ?? null,
+    resultado_no: data.resultado_no ?? null,
   })
 
   if (error) throw new Error(error.message)
@@ -52,6 +56,8 @@ export async function updatePregunta(
     activa: boolean
     opciones?: string[] | null
     accion?: string | null
+    resultado_si?: string | null
+    resultado_no?: string | null
   }
 ): Promise<void> {
   await requireAdmin()
@@ -66,6 +72,8 @@ export async function updatePregunta(
       activa: data.activa,
       opciones: data.opciones ?? null,
       accion: data.accion ?? null,
+      resultado_si: data.resultado_si ?? null,
+      resultado_no: data.resultado_no ?? null,
     })
     .eq('id', id)
 
