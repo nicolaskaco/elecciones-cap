@@ -63,6 +63,35 @@ export async function getFlowData(): Promise<{
   }
 }
 
+export async function confirmEnviarLista(
+  electorId: number,
+  personaId: number,
+  direccion: string | null
+): Promise<void> {
+  const supabase = await createClient()
+  const perfil = await getRequiredPerfil()
+
+  if (perfil.rol === 'Voluntario') {
+    const { data: elector } = await supabase
+      .from('electores')
+      .select('asignado_a')
+      .eq('id', electorId)
+      .single()
+    if (!elector || elector.asignado_a !== perfil.id) throw new Error('Sin permiso')
+  }
+
+  const [electorUpdate, personaUpdate] = await Promise.all([
+    supabase.from('electores').update({ enviar_lista: true }).eq('id', electorId),
+    supabase.from('personas').update({ direccion: direccion ?? null }).eq('id', personaId),
+  ])
+
+  if (electorUpdate.error) throw new Error(electorUpdate.error.message)
+  if (personaUpdate.error) throw new Error(personaUpdate.error.message)
+
+  revalidatePath('/electores')
+  revalidatePath(`/electores/${electorId}`)
+}
+
 export async function submitLlamada(input: SubmitLlamadaInput): Promise<{ llamada_id: number }> {
   const supabase = await createClient()
   const perfil = await getRequiredPerfil()
@@ -105,8 +134,17 @@ export async function submitLlamada(input: SubmitLlamadaInput): Promise<{ llamad
     if (respuestasError) throw new Error(respuestasError.message)
   }
 
-  // Update elector estado
-  const nuevoEstado = RESULTADO_TO_ESTADO[input.resultado]
+  // Update elector estado — if enviar_lista was confirmed during the call, use Para_Enviar
+  const { data: electorActual } = await supabase
+    .from('electores')
+    .select('enviar_lista')
+    .eq('id', input.elector_id)
+    .single()
+
+  const nuevoEstado = electorActual?.enviar_lista
+    ? 'Para_Enviar'
+    : RESULTADO_TO_ESTADO[input.resultado]
+
   const { error: updateError } = await supabase
     .from('electores')
     .update({ estado: nuevoEstado })

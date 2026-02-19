@@ -25,6 +25,7 @@ export async function createPregunta(data: {
   orden_default?: number | null
   activa: boolean
   opciones?: string[] | null
+  accion?: string | null
 }): Promise<void> {
   await requireAdmin()
   const supabase = await createClient()
@@ -35,6 +36,7 @@ export async function createPregunta(data: {
     orden_default: data.orden_default ?? null,
     activa: data.activa,
     opciones: data.opciones ?? null,
+    accion: data.accion ?? null,
   })
 
   if (error) throw new Error(error.message)
@@ -49,6 +51,7 @@ export async function updatePregunta(
     orden_default?: number | null
     activa: boolean
     opciones?: string[] | null
+    accion?: string | null
   }
 ): Promise<void> {
   await requireAdmin()
@@ -62,6 +65,7 @@ export async function updatePregunta(
       orden_default: data.orden_default ?? null,
       activa: data.activa,
       opciones: data.opciones ?? null,
+      accion: data.accion ?? null,
     })
     .eq('id', id)
 
