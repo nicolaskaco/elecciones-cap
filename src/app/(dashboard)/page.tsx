@@ -33,8 +33,21 @@ async function getUpcomingEventos(): Promise<Evento[]> {
     .select('*')
     .gte('fecha', today)
     .order('fecha', { ascending: true })
-    .limit(5)
-  return (data ?? []) as Evento[]
+    .limit(20)
+
+  const now = new Date()
+  return ((data ?? []) as Evento[])
+    .filter((e) => {
+      const base = new Date(e.fecha + 'T00:00:00')
+      if (e.hora) {
+        const [h, m] = e.hora.split(':').map(Number)
+        base.setHours(h, m, 0, 0)
+      } else {
+        base.setHours(23, 59, 59, 999)
+      }
+      return base > now
+    })
+    .slice(0, 5)
 }
 
 function formatFecha(fecha: string) {
