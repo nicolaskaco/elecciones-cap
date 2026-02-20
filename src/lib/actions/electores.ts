@@ -14,7 +14,7 @@ export async function getElectores(opts?: {
 
   let query = supabase
     .from('electores')
-    .select('*, personas(*)')
+    .select('*, personas!inner(*)')
     .order('created_at', { ascending: false })
 
   if (perfil.rol === 'Voluntario') {
@@ -43,7 +43,7 @@ export async function getElectorById(id: number): Promise<ElectorConPersona | nu
 
   const { data, error } = await supabase
     .from('electores')
-    .select('*, personas(*)')
+    .select('*, personas!inner(*)')
     .eq('id', id)
     .single()
 

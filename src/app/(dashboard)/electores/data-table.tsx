@@ -192,10 +192,10 @@ export function ElectoresDataTable({ electores, isAdmin, voluntarios }: Props) {
                   className="cursor-pointer"
                   onClick={() => router.push(`/electores/${e.id}`)}
                 >
-                  <TableCell className="font-medium">{e.personas.nombre}</TableCell>
-                  {isAdmin && <TableCell>{e.personas.cedula ?? '-'}</TableCell>}
-                  {isAdmin && <TableCell>{e.personas.nro_socio ?? '-'}</TableCell>}
-                  <TableCell>{e.personas.celular ?? e.personas.telefono ?? '-'}</TableCell>
+                  <TableCell className="font-medium">{e.personas?.nombre ?? '-'}</TableCell>
+                  {isAdmin && <TableCell>{e.personas?.cedula ?? '-'}</TableCell>}
+                  {isAdmin && <TableCell>{e.personas?.nro_socio ?? '-'}</TableCell>}
+                  <TableCell>{e.personas?.celular ?? e.personas?.telefono ?? '-'}</TableCell>
                   {isAdmin && (
                     <TableCell>
                       <Badge variant={estadoBadgeVariant[e.estado] ?? 'outline'}>
