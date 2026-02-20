@@ -8,6 +8,7 @@ import type { ElectorConPersona, ElectorEstado } from '@/types/database'
 export async function getElectores(opts?: {
   search?: string
   estado?: ElectorEstado | ''
+  sinAsignar?: boolean
 }): Promise<ElectorConPersona[]> {
   const supabase = await createClient()
   const perfil = await getRequiredPerfil()
@@ -23,6 +24,10 @@ export async function getElectores(opts?: {
 
   if (opts?.estado) {
     query = query.eq('estado', opts.estado)
+  }
+
+  if (opts?.sinAsignar) {
+    query = query.is('asignado_a', null)
   }
 
   if (opts?.search) {

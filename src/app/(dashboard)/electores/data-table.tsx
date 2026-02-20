@@ -97,6 +97,13 @@ export function ElectoresDataTable({ electores, isAdmin, voluntarios }: Props) {
     router.push(`/electores?${params.toString()}`)
   }
 
+  function handleSinAsignarToggle() {
+    const params = new URLSearchParams(searchParams.toString())
+    if (searchParams.get('sinAsignar') === '1') params.delete('sinAsignar')
+    else params.set('sinAsignar', '1')
+    router.push(`/electores?${params.toString()}`)
+  }
+
   async function handleDeleteConfirm() {
     if (pendingDeleteId === null) return
     const id = pendingDeleteId
@@ -199,6 +206,13 @@ export function ElectoresDataTable({ electores, isAdmin, voluntarios }: Props) {
 
           {isAdmin && (
             <>
+              <Button
+                variant={searchParams.get('sinAsignar') === '1' ? 'default' : 'outline'}
+                size="sm"
+                onClick={handleSinAsignarToggle}
+              >
+                Sin asignar
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
