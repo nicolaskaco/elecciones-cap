@@ -109,12 +109,14 @@ export async function importElectores(rows: ImportRow[]): Promise<ImportResult> 
     else toInsert.push({ row, i })
   }
 
-  // --- Bulk insert new personas + electores ---
-  if (toInsert.length > 0) {
+  // --- Bulk insert new personas + electores in chunks of 500 ---
+  const INSERT_CHUNK = 500
+  for (let c = 0; c < toInsert.length; c += INSERT_CHUNK) {
+    const chunk = toInsert.slice(c, c + INSERT_CHUNK)
     const { data: newPersonas, error: insertError } = await supabase
       .from('personas')
       .insert(
-        toInsert.map(({ row }) => ({
+        chunk.map(({ row }) => ({
           nombre: row.nombre,
           cedula: row.cedula || null,
           nro_socio: row.nro_socio || null,
@@ -128,33 +130,18 @@ export async function importElectores(rows: ImportRow[]): Promise<ImportResult> 
       .select('id')
 
     if (insertError || !newPersonas) {
-      // Bulk insert failed (e.g. duplicate within the batch) — fall back row by row
-      for (const { row, i } of toInsert) {
-        const { data: p, error } = await supabase
-          .from('personas')
-          .insert({
-            nombre: row.nombre,
-            cedula: row.cedula || null,
-            nro_socio: row.nro_socio || null,
-            telefono: row.telefono || null,
-            celular: row.celular || null,
-            email: row.email || null,
-            direccion: row.direccion || null,
-            fecha_nacimiento: row.fecha_nacimiento || null,
-          })
-          .select('id')
-          .single()
-        if (error || !p) { errors.push(`Fila ${i + 1}: ${error?.message ?? 'Error'}`); continue }
-        await supabase.from('electores').insert({ persona_id: p.id, estado: 'Pendiente' })
-        created++
-      }
+      errors.push(`Error al insertar filas ${c + 1}-${c + chunk.length}: ${insertError?.message ?? 'Error desconocido'}`)
+      continue
+    }
+
+    // Bulk insert electores for this chunk
+    const { error: electorError } = await supabase
+      .from('electores')
+      .insert(newPersonas.map((p) => ({ persona_id: p.id, estado: 'Pendiente' })))
+    if (electorError) {
+      errors.push(`Error al crear electores para filas ${c + 1}-${c + chunk.length}: ${electorError.message}`)
     } else {
-      // Bulk insert electores for all new personas
-      const { error: electorError } = await supabase
-        .from('electores')
-        .insert(newPersonas.map((p) => ({ persona_id: p.id, estado: 'Pendiente' })))
-      if (electorError) errors.push(`Error al crear electores: ${electorError.message}`)
-      else created += newPersonas.length
+      created += newPersonas.length
     }
   }
 
