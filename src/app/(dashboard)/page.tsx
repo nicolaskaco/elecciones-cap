@@ -1,9 +1,10 @@
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { getRequiredPerfil } from '@/lib/auth'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Users, Phone, CheckCircle, TrendingUp, Calendar, MapPin, Clock } from 'lucide-react'
+import { Users, Phone, CheckCircle, TrendingUp, Calendar, MapPin, Clock, BarChart2 } from 'lucide-react'
 import type { Evento } from '@/types/database'
 
 async function getKPIs() {
@@ -53,6 +54,36 @@ async function getVoluntariosStats() {
   )
 }
 
+const ESTADO_ORDER = [
+  'Pendiente',
+  'Llamado',
+  'Confirmado',
+  'Para_Enviar',
+  'Lista_Enviada',
+  'Numero_Incorrecto',
+  'Descartado',
+] as const
+
+const ESTADO_COLORS: Record<string, string> = {
+  Pendiente: 'bg-gray-400',
+  Llamado: 'bg-blue-400',
+  Confirmado: 'bg-green-500',
+  Para_Enviar: 'bg-yellow-400',
+  Lista_Enviada: 'bg-teal-400',
+  Numero_Incorrecto: 'bg-orange-400',
+  Descartado: 'bg-red-400',
+}
+
+async function getEstadoBreakdown() {
+  const supabase = await createClient()
+  const { data } = await supabase.from('electores').select('estado')
+  const rows = data ?? []
+  const total = rows.length
+  const counts = Object.fromEntries(ESTADO_ORDER.map((e) => [e, 0])) as Record<string, number>
+  for (const r of rows) counts[r.estado] = (counts[r.estado] ?? 0) + 1
+  return { total, counts }
+}
+
 async function getUpcomingEventos(): Promise<Evento[]> {
   const supabase = await createClient()
   const today = new Date().toISOString().split('T')[0]
@@ -88,10 +119,11 @@ export default async function DashboardPage() {
   const perfil = await getRequiredPerfil()
   const isAdmin = perfil.rol === 'Admin'
 
-  const [kpis, eventos, voluntariosStats] = await Promise.all([
+  const [kpis, eventos, voluntariosStats, estadoBreakdown] = await Promise.all([
     getKPIs(),
     getUpcomingEventos(),
     isAdmin ? getVoluntariosStats() : Promise.resolve([]),
+    isAdmin ? getEstadoBreakdown() : Promise.resolve(null),
   ])
 
   const cards = [
@@ -182,6 +214,45 @@ export default async function DashboardPage() {
                 ))}
               </TableBody>
             </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {isAdmin && estadoBreakdown && estadoBreakdown.total > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart2 className="h-5 w-5" />
+              Electores por Estado
+            </CardTitle>
+            <CardDescription>{estadoBreakdown.total} electores en total</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {ESTADO_ORDER.map((estado) => {
+              const count = estadoBreakdown.counts[estado] ?? 0
+              const pct = estadoBreakdown.total > 0 ? Math.round((count / estadoBreakdown.total) * 100) : 0
+              return (
+                <Link
+                  key={estado}
+                  href={`/electores?estado=${estado}`}
+                  className="flex items-center gap-3 group"
+                >
+                  <span className="w-32 shrink-0 text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+                    {estado.replace(/_/g, ' ')}
+                  </span>
+                  <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${ESTADO_COLORS[estado]} transition-all`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <span className="w-16 shrink-0 text-right text-sm tabular-nums">
+                    <span className="font-medium">{count}</span>
+                    <span className="text-muted-foreground ml-1">({pct}%)</span>
+                  </span>
+                </Link>
+              )
+            })}
           </CardContent>
         </Card>
       )}
