@@ -102,8 +102,23 @@ export function ElectoresDataTable({ electores, isAdmin, voluntarios }: Props) {
 
   function handleSinAsignarToggle() {
     const params = new URLSearchParams(searchParams.toString())
-    if (searchParams.get('sinAsignar') === '1') params.delete('sinAsignar')
-    else params.set('sinAsignar', '1')
+    if (searchParams.get('sinAsignar') === '1') {
+      params.delete('sinAsignar')
+    } else {
+      params.set('sinAsignar', '1')
+      params.delete('asignadoA')
+    }
+    router.push(`/electores?${params.toString()}`)
+  }
+
+  function handleVoluntarioFilter(value: string) {
+    const params = new URLSearchParams(searchParams.toString())
+    if (value && value !== 'all') {
+      params.set('asignadoA', value)
+      params.delete('sinAsignar')
+    } else {
+      params.delete('asignadoA')
+    }
     router.push(`/electores?${params.toString()}`)
   }
 
@@ -229,6 +244,22 @@ export function ElectoresDataTable({ electores, isAdmin, voluntarios }: Props) {
 
           {isAdmin && (
             <>
+              <Select
+                defaultValue={searchParams.get('asignadoA') ?? 'all'}
+                onValueChange={handleVoluntarioFilter}
+              >
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue placeholder="Voluntario" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {voluntarios.map((v) => (
+                    <SelectItem key={v.id} value={v.id}>
+                      {v.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Button
                 variant={searchParams.get('sinAsignar') === '1' ? 'default' : 'outline'}
                 size="sm"

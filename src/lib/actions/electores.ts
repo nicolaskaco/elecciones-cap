@@ -9,6 +9,7 @@ export async function getElectores(opts?: {
   search?: string
   estado?: ElectorEstado | ''
   sinAsignar?: boolean
+  asignadoA?: string
 }): Promise<ElectorConPersona[]> {
   const supabase = await createClient()
   const perfil = await getRequiredPerfil()
@@ -28,6 +29,10 @@ export async function getElectores(opts?: {
 
   if (opts?.sinAsignar) {
     query = query.is('asignado_a', null)
+  }
+
+  if (opts?.asignadoA) {
+    query = query.eq('asignado_a', opts.asignadoA)
   }
 
   if (opts?.search) {

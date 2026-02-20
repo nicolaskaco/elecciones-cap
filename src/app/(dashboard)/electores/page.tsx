@@ -5,7 +5,7 @@ import { ElectoresDataTable } from './data-table'
 export default async function ElectoresPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string; estado?: string; sinAsignar?: string }>
+  searchParams: Promise<{ search?: string; estado?: string; sinAsignar?: string; asignadoA?: string }>
 }) {
   const params = await searchParams
   const perfil = await getRequiredPerfil()
@@ -15,6 +15,7 @@ export default async function ElectoresPage({
     search: params.search,
     estado: (params.estado as '' | undefined) || '',
     sinAsignar: params.sinAsignar === '1',
+    asignadoA: params.asignadoA,
   })
 
   const voluntarios = isAdmin ? await getVoluntarios() : []
