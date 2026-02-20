@@ -21,78 +21,116 @@ interface ImportResult {
   errors: string[]
 }
 
+// Build lookup maps for existing personas in bulk (2 queries total regardless of row count)
+async function buildLookupMaps(supabase: Awaited<ReturnType<typeof createClient>>, rows: ImportRow[]) {
+  const cedulas = Array.from(new Set(rows.map((r) => r.cedula).filter(Boolean) as string[]))
+  const nroSocios = Array.from(new Set(rows.map((r) => r.nro_socio).filter(Boolean) as string[]))
+
+  const [cedulaRes, nroSocioRes] = await Promise.all([
+    cedulas.length > 0
+      ? supabase.from('personas').select('id, cedula').in('cedula', cedulas)
+      : Promise.resolve({ data: [] as { id: number; cedula: string | null }[], error: null }),
+    nroSocios.length > 0
+      ? supabase.from('personas').select('id, nro_socio').in('nro_socio', nroSocios)
+      : Promise.resolve({ data: [] as { id: number; nro_socio: string | null }[], error: null }),
+  ])
+
+  const byCedula = new Map<string, number>()
+  cedulaRes.data?.forEach((p) => { if (p.cedula) byCedula.set(p.cedula, p.id) })
+
+  const byNroSocio = new Map<string, number>()
+  nroSocioRes.data?.forEach((p) => { if (p.nro_socio) byNroSocio.set(p.nro_socio, p.id) })
+
+  return { byCedula, byNroSocio }
+}
+
+export async function previewImport(rows: ImportRow[]): Promise<{
+  newRows: number[]
+  updateRows: number[]
+  errorRows: { index: number; message: string }[]
+}> {
+  await requireAdmin()
+  const supabase = await createClient()
+
+  const { byCedula, byNroSocio } = await buildLookupMaps(supabase, rows)
+
+  const newRows: number[] = []
+  const updateRows: number[] = []
+  const errorRows: { index: number; message: string }[] = []
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i]
+    if (!row.nombre) {
+      errorRows.push({ index: i, message: 'nombre es requerido' })
+      continue
+    }
+    const found =
+      (row.cedula && byCedula.has(row.cedula)) ||
+      (row.nro_socio && byNroSocio.has(row.nro_socio))
+    if (found) updateRows.push(i)
+    else newRows.push(i)
+  }
+
+  return { newRows, updateRows, errorRows }
+}
+
 export async function importElectores(rows: ImportRow[]): Promise<ImportResult> {
   await requireAdmin()
   const supabase = await createClient()
 
+  const errors: string[] = []
   let created = 0
   let updated = 0
-  const errors: string[] = []
 
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i]
-
-    if (!row.nombre) {
-      errors.push(`Fila ${i + 1}: nombre es requerido`)
-      continue
-    }
-
-    try {
-      // Try to find existing persona by cedula or nro_socio
-      let existingPersona: { id: number } | null = null
-
-      if (row.cedula) {
-        const { data } = await supabase
-          .from('personas')
-          .select('id')
-          .eq('cedula', row.cedula)
-          .single()
-        if (data) existingPersona = data
+  // Validate rows
+  const validRows = rows
+    .map((row, i) => {
+      if (!row.nombre) {
+        errors.push(`Fila ${i + 1}: nombre es requerido`)
+        return null
       }
+      return { row, i }
+    })
+    .filter(Boolean) as { row: ImportRow; i: number }[]
 
-      if (!existingPersona && row.nro_socio) {
-        const { data } = await supabase
-          .from('personas')
-          .select('id')
-          .eq('nro_socio', row.nro_socio)
-          .single()
-        if (data) existingPersona = data
-      }
+  if (validRows.length === 0) return { created, updated, errors }
 
-      if (existingPersona) {
-        // Update existing persona
-        await supabase
-          .from('personas')
-          .update({
-            nombre: row.nombre,
-            cedula: row.cedula || null,
-            nro_socio: row.nro_socio || null,
-            telefono: row.telefono || null,
-            celular: row.celular || null,
-            email: row.email || null,
-            direccion: row.direccion || null,
-            fecha_nacimiento: row.fecha_nacimiento || null,
-          })
-          .eq('id', existingPersona.id)
+  // Batch lookup
+  const { byCedula, byNroSocio } = await buildLookupMaps(supabase, validRows.map((r) => r.row))
 
-        // Ensure elector exists for this persona
-        const { data: existingElector } = await supabase
-          .from('electores')
-          .select('id')
-          .eq('persona_id', existingPersona.id)
-          .single()
+  const toInsert: { row: ImportRow; i: number }[] = []
+  const toUpdate: { row: ImportRow; i: number; personaId: number }[] = []
 
-        if (!existingElector) {
-          await supabase.from('electores').insert({
-            persona_id: existingPersona.id,
-            estado: 'Pendiente',
-          })
-        }
+  for (const { row, i } of validRows) {
+    let existingId: number | undefined
+    if (row.cedula) existingId = byCedula.get(row.cedula)
+    if (!existingId && row.nro_socio) existingId = byNroSocio.get(row.nro_socio)
+    if (existingId) toUpdate.push({ row, i, personaId: existingId })
+    else toInsert.push({ row, i })
+  }
 
-        updated++
-      } else {
-        // Create new persona + elector
-        const { data: newPersona, error: personaError } = await supabase
+  // --- Bulk insert new personas + electores ---
+  if (toInsert.length > 0) {
+    const { data: newPersonas, error: insertError } = await supabase
+      .from('personas')
+      .insert(
+        toInsert.map(({ row }) => ({
+          nombre: row.nombre,
+          cedula: row.cedula || null,
+          nro_socio: row.nro_socio || null,
+          telefono: row.telefono || null,
+          celular: row.celular || null,
+          email: row.email || null,
+          direccion: row.direccion || null,
+          fecha_nacimiento: row.fecha_nacimiento || null,
+        }))
+      )
+      .select('id')
+
+    if (insertError || !newPersonas) {
+      // Bulk insert failed (e.g. duplicate within the batch) — fall back row by row
+      for (const { row, i } of toInsert) {
+        const { data: p, error } = await supabase
           .from('personas')
           .insert({
             nombre: row.nombre,
@@ -106,74 +144,61 @@ export async function importElectores(rows: ImportRow[]): Promise<ImportResult> 
           })
           .select('id')
           .single()
-
-        if (personaError) {
-          errors.push(`Fila ${i + 1}: ${personaError.message}`)
-          continue
-        }
-
-        await supabase.from('electores').insert({
-          persona_id: newPersona.id,
-          estado: 'Pendiente',
-        })
-
+        if (error || !p) { errors.push(`Fila ${i + 1}: ${error?.message ?? 'Error'}`); continue }
+        await supabase.from('electores').insert({ persona_id: p.id, estado: 'Pendiente' })
         created++
       }
-    } catch {
-      errors.push(`Fila ${i + 1}: Error inesperado`)
+    } else {
+      // Bulk insert electores for all new personas
+      const { error: electorError } = await supabase
+        .from('electores')
+        .insert(newPersonas.map((p) => ({ persona_id: p.id, estado: 'Pendiente' })))
+      if (electorError) errors.push(`Error al crear electores: ${electorError.message}`)
+      else created += newPersonas.length
+    }
+  }
+
+  // --- Update existing personas in parallel chunks ---
+  const CHUNK = 50
+  for (let c = 0; c < toUpdate.length; c += CHUNK) {
+    const chunk = toUpdate.slice(c, c + CHUNK)
+    await Promise.all(
+      chunk.map(({ row, personaId }) =>
+        supabase
+          .from('personas')
+          .update({
+            nombre: row.nombre,
+            cedula: row.cedula || null,
+            nro_socio: row.nro_socio || null,
+            telefono: row.telefono || null,
+            celular: row.celular || null,
+            email: row.email || null,
+            direccion: row.direccion || null,
+            fecha_nacimiento: row.fecha_nacimiento || null,
+          })
+          .eq('id', personaId)
+      )
+    )
+    updated += chunk.length
+  }
+
+  // Ensure electores exist for updated personas (bulk check + insert missing)
+  if (toUpdate.length > 0) {
+    const personaIds = toUpdate.map((t) => t.personaId)
+    const { data: existingElectores } = await supabase
+      .from('electores')
+      .select('persona_id')
+      .in('persona_id', personaIds)
+
+    const existingSet = new Set(existingElectores?.map((e) => e.persona_id) ?? [])
+    const missing = personaIds.filter((id) => !existingSet.has(id))
+    if (missing.length > 0) {
+      await supabase
+        .from('electores')
+        .insert(missing.map((pid) => ({ persona_id: pid, estado: 'Pendiente' })))
     }
   }
 
   revalidatePath('/electores')
   return { created, updated, errors }
-}
-
-export async function previewImport(rows: ImportRow[]): Promise<{
-  newRows: number[]
-  updateRows: number[]
-  errorRows: { index: number; message: string }[]
-}> {
-  await requireAdmin()
-  const supabase = await createClient()
-
-  const newRows: number[] = []
-  const updateRows: number[] = []
-  const errorRows: { index: number; message: string }[] = []
-
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i]
-
-    if (!row.nombre) {
-      errorRows.push({ index: i, message: 'nombre es requerido' })
-      continue
-    }
-
-    let found = false
-
-    if (row.cedula) {
-      const { data } = await supabase
-        .from('personas')
-        .select('id')
-        .eq('cedula', row.cedula)
-        .single()
-      if (data) found = true
-    }
-
-    if (!found && row.nro_socio) {
-      const { data } = await supabase
-        .from('personas')
-        .select('id')
-        .eq('nro_socio', row.nro_socio)
-        .single()
-      if (data) found = true
-    }
-
-    if (found) {
-      updateRows.push(i)
-    } else {
-      newRows.push(i)
-    }
-  }
-
-  return { newRows, updateRows, errorRows }
 }
