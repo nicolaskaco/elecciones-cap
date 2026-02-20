@@ -1,12 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Search, Download, Upload, Plus, Trash2 } from 'lucide-react'
+import { Search, Download, Upload, Plus, Trash2, UserCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Select,
   SelectContent,
@@ -26,7 +27,7 @@ import { Badge } from '@/components/ui/badge'
 import type { ElectorConPersona } from '@/types/database'
 import { ELECTOR_ESTADOS } from '@/lib/validations/elector'
 import { exportElectoresToCSV } from '@/lib/csv-export'
-import { deleteElector } from '@/lib/actions/electores'
+import { deleteElector, asignarElectoresEnMasa } from '@/lib/actions/electores'
 import { ElectorFormDialog } from './elector-form'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 
@@ -67,9 +68,16 @@ export function ElectoresDataTable({ electores, isAdmin, voluntarios }: Props) {
   const [editingElector, setEditingElector] = useState<ElectorConPersona | null>(null)
   const [deleting, setDeleting] = useState<number | null>(null)
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null)
+  const [selected, setSelected] = useState<Set<number>>(new Set())
+  const [assignVoluntarioId, setAssignVoluntarioId] = useState<string>('')
+  const [isPending, startTransition] = useTransition()
 
   const totalPages = Math.ceil(electores.length / PAGE_SIZE)
   const paged = electores.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+
+  const allIds = electores.map((e) => e.id)
+  const allSelected = allIds.length > 0 && allIds.every((id) => selected.has(id))
+  const someSelected = !allSelected && allIds.some((id) => selected.has(id))
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault()
@@ -112,6 +120,45 @@ export function ElectoresDataTable({ electores, isAdmin, voluntarios }: Props) {
   function handleCreate() {
     setEditingElector(null)
     setDialogOpen(true)
+  }
+
+  function toggleSelectAll() {
+    if (allSelected) {
+      setSelected(new Set())
+    } else {
+      setSelected(new Set(allIds))
+    }
+  }
+
+  function toggleRow(id: number) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function handleCancelSelection() {
+    setSelected(new Set())
+    setAssignVoluntarioId('')
+  }
+
+  function handleApplyAssign() {
+    startTransition(async () => {
+      try {
+        await asignarElectoresEnMasa(
+          Array.from(selected),
+          assignVoluntarioId === '__none__' ? null : assignVoluntarioId || null
+        )
+        toast.success(`${selected.size} elector${selected.size !== 1 ? 'es' : ''} asignado${selected.size !== 1 ? 's' : ''}`)
+        setSelected(new Set())
+        setAssignVoluntarioId('')
+        router.refresh()
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Error al asignar')
+      }
+    })
   }
 
   return (
@@ -175,10 +222,48 @@ export function ElectoresDataTable({ electores, isAdmin, voluntarios }: Props) {
         </div>
       </div>
 
+      {/* Bulk assignment toolbar */}
+      {isAdmin && selected.size > 0 && (
+        <div className="flex items-center gap-3 rounded-md border bg-muted/50 px-4 py-2">
+          <UserCheck className="h-4 w-4 text-muted-foreground shrink-0" />
+          <span className="text-sm font-medium">{selected.size} seleccionado{selected.size !== 1 ? 's' : ''}</span>
+          <span className="text-muted-foreground text-sm">·</span>
+          <span className="text-sm text-muted-foreground">Asignar a:</span>
+          <Select value={assignVoluntarioId} onValueChange={setAssignVoluntarioId}>
+            <SelectTrigger className="w-[180px] h-8">
+              <SelectValue placeholder="Elegir voluntario" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">Sin asignar</SelectItem>
+              {voluntarios.map((v) => (
+                <SelectItem key={v.id} value={v.id}>
+                  {v.nombre}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button size="sm" disabled={isPending} onClick={handleApplyAssign}>
+            Aplicar
+          </Button>
+          <Button size="sm" variant="ghost" onClick={handleCancelSelection}>
+            Cancelar
+          </Button>
+        </div>
+      )}
+
       <div className="rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
+              {isAdmin && (
+                <TableHead className="w-[40px]">
+                  <Checkbox
+                    checked={allSelected ? true : someSelected ? 'indeterminate' : false}
+                    onCheckedChange={toggleSelectAll}
+                    aria-label="Seleccionar todos"
+                  />
+                </TableHead>
+              )}
               <TableHead>Nombre</TableHead>
               {isAdmin && <TableHead>Edad</TableHead>}
               {isAdmin && <TableHead>Nro Socio</TableHead>}
@@ -191,7 +276,7 @@ export function ElectoresDataTable({ electores, isAdmin, voluntarios }: Props) {
           <TableBody>
             {paged.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={isAdmin ? 7 : 2} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={isAdmin ? 8 : 2} className="text-center text-muted-foreground py-8">
                   No se encontraron electores
                 </TableCell>
               </TableRow>
@@ -199,9 +284,19 @@ export function ElectoresDataTable({ electores, isAdmin, voluntarios }: Props) {
               paged.map((e) => (
                 <TableRow
                   key={e.id}
-                  className="cursor-pointer"
+                  className={`cursor-pointer${selected.has(e.id) ? ' bg-muted/50' : ''}`}
                   onClick={() => router.push(`/electores/${e.id}`)}
                 >
+                  {isAdmin && (
+                    <TableCell>
+                      <Checkbox
+                        checked={selected.has(e.id)}
+                        onCheckedChange={() => toggleRow(e.id)}
+                        onClick={(ev) => ev.stopPropagation()}
+                        aria-label="Seleccionar elector"
+                      />
+                    </TableCell>
+                  )}
                   <TableCell className="font-medium">{e.personas?.nombre ?? '-'}</TableCell>
                   {isAdmin && <TableCell>{calcEdad(e.personas?.fecha_nacimiento)}</TableCell>}
                   {isAdmin && <TableCell>{e.personas?.nro_socio ?? '-'}</TableCell>}
