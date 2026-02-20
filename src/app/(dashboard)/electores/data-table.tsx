@@ -42,6 +42,16 @@ const estadoBadgeVariant: Record<string, 'default' | 'secondary' | 'destructive'
 
 const PAGE_SIZE = 20
 
+function calcEdad(fechaNacimiento: string | null | undefined): string {
+  if (!fechaNacimiento) return '-'
+  const hoy = new Date()
+  const nac = new Date(fechaNacimiento)
+  let edad = hoy.getFullYear() - nac.getFullYear()
+  const m = hoy.getMonth() - nac.getMonth()
+  if (m < 0 || (m === 0 && hoy.getDate() < nac.getDate())) edad--
+  return edad >= 0 ? String(edad) : '-'
+}
+
 interface Props {
   electores: ElectorConPersona[]
   isAdmin: boolean
@@ -170,7 +180,7 @@ export function ElectoresDataTable({ electores, isAdmin, voluntarios }: Props) {
           <TableHeader>
             <TableRow>
               <TableHead>Nombre</TableHead>
-              {isAdmin && <TableHead>Cedula</TableHead>}
+              {isAdmin && <TableHead>Edad</TableHead>}
               {isAdmin && <TableHead>Nro Socio</TableHead>}
               <TableHead>Celular</TableHead>
               {isAdmin && <TableHead>Estado</TableHead>}
@@ -193,7 +203,7 @@ export function ElectoresDataTable({ electores, isAdmin, voluntarios }: Props) {
                   onClick={() => router.push(`/electores/${e.id}`)}
                 >
                   <TableCell className="font-medium">{e.personas?.nombre ?? '-'}</TableCell>
-                  {isAdmin && <TableCell>{e.personas?.cedula ?? '-'}</TableCell>}
+                  {isAdmin && <TableCell>{calcEdad(e.personas?.fecha_nacimiento)}</TableCell>}
                   {isAdmin && <TableCell>{e.personas?.nro_socio ?? '-'}</TableCell>}
                   <TableCell>{e.personas?.celular ?? e.personas?.telefono ?? '-'}</TableCell>
                   {isAdmin && (
