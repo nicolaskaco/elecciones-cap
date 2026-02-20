@@ -102,8 +102,23 @@ export function ElectoresDataTable({ electores, isAdmin, voluntarios }: Props) {
 
   function handleSinAsignarToggle() {
     const params = new URLSearchParams(searchParams.toString())
-    if (searchParams.get('sinAsignar') === '1') params.delete('sinAsignar')
-    else params.set('sinAsignar', '1')
+    if (searchParams.get('sinAsignar') === '1') {
+      params.delete('sinAsignar')
+    } else {
+      params.set('sinAsignar', '1')
+      params.delete('asignadoA')
+    }
+    router.push(`/electores?${params.toString()}`)
+  }
+
+  function handleVoluntarioFilter(value: string) {
+    const params = new URLSearchParams(searchParams.toString())
+    if (value && value !== 'all') {
+      params.set('asignadoA', value)
+      params.delete('sinAsignar')
+    } else {
+      params.delete('asignadoA')
+    }
     router.push(`/electores?${params.toString()}`)
   }
 
@@ -211,7 +226,7 @@ export function ElectoresDataTable({ electores, isAdmin, voluntarios }: Props) {
 
         <div className="flex items-center gap-2">
           <Select
-            defaultValue={searchParams.get('estado') ?? 'all'}
+            value={searchParams.get('estado') ?? 'all'}
             onValueChange={handleEstadoFilter}
           >
             <SelectTrigger className="w-[160px]">
@@ -229,6 +244,22 @@ export function ElectoresDataTable({ electores, isAdmin, voluntarios }: Props) {
 
           {isAdmin && (
             <>
+              <Select
+                value={searchParams.get('asignadoA') ?? 'all'}
+                onValueChange={handleVoluntarioFilter}
+              >
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue placeholder="Voluntario" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {voluntarios.map((v) => (
+                    <SelectItem key={v.id} value={v.id}>
+                      {v.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Button
                 variant={searchParams.get('sinAsignar') === '1' ? 'default' : 'outline'}
                 size="sm"
