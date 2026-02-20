@@ -226,7 +226,7 @@ export function ElectoresDataTable({ electores, isAdmin, voluntarios }: Props) {
 
         <div className="flex items-center gap-2">
           <Select
-            defaultValue={searchParams.get('estado') ?? 'all'}
+            value={searchParams.get('estado') ?? 'all'}
             onValueChange={handleEstadoFilter}
           >
             <SelectTrigger className="w-[160px]">
@@ -245,7 +245,7 @@ export function ElectoresDataTable({ electores, isAdmin, voluntarios }: Props) {
           {isAdmin && (
             <>
               <Select
-                defaultValue={searchParams.get('asignadoA') ?? 'all'}
+                value={searchParams.get('asignadoA') ?? 'all'}
                 onValueChange={handleVoluntarioFilter}
               >
                 <SelectTrigger className="w-[160px]">
