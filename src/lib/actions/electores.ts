@@ -236,6 +236,17 @@ export async function cambiarEstadoEnMasa(
   revalidatePath('/electores')
 }
 
+export async function updateNotas(electorId: number, notas: string | null): Promise<void> {
+  await requireAdmin()
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('electores')
+    .update({ notas: notas || null })
+    .eq('id', electorId)
+  if (error) throw new Error(error.message)
+  revalidatePath(`/electores/${electorId}`)
+}
+
 export async function marcarCartasEnviadas(ids: number[]): Promise<void> {
   await requireAdmin()
   if (ids.length === 0) return
