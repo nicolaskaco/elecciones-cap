@@ -7,7 +7,7 @@ import { getElectorById, getVoluntarios } from '@/lib/actions/electores'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { ElectorDetailActions } from './actions'
+import { ElectorDetailActions, NotasInlineEditor } from './actions'
 import { RESULTADO_LABELS } from '@/lib/validations/llamada'
 import type { LlamadaResultado } from '@/types/database'
 
@@ -157,11 +157,15 @@ export default async function ElectorDetailPage({
               <span className="text-sm text-muted-foreground">Asignado a</span>
               <span className="text-sm font-medium">{asignadoNombre ?? '—'}</span>
             </div>
-            {elector.notas && (
-              <div>
-                <span className="text-sm text-muted-foreground">Notas</span>
-                <p className="text-sm mt-1 whitespace-pre-wrap">{elector.notas}</p>
-              </div>
+            {isAdmin ? (
+              <NotasInlineEditor electorId={elector.id} notas={elector.notas} />
+            ) : (
+              elector.notas && (
+                <div>
+                  <span className="text-sm text-muted-foreground">Notas</span>
+                  <p className="text-sm mt-1 whitespace-pre-wrap">{elector.notas}</p>
+                </div>
+              )
             )}
           </CardContent>
         </Card>
