@@ -140,52 +140,127 @@ export function VoluntarioView({ electores }: VoluntarioViewProps) {
   )
 }
 
+const RESULTADOS = ['Nos_Vota', 'No_Nos_Vota', 'No_Atendio', 'Numero_Incorrecto'] as const
+
 interface AdminViewProps {
   llamadas: LlamadaConDetalles[]
 }
 
 export function AdminView({ llamadas }: AdminViewProps) {
+  // Aggregate by resultado
+  const porResultado = RESULTADOS.map((r) => ({
+    resultado: r,
+    count: llamadas.filter((l) => l.resultado === r).length,
+  }))
+
+  // Aggregate by voluntario
+  const voluntarioMap = new Map<string, { nombre: string; counts: Record<string, number>; total: number }>()
+  for (const l of llamadas) {
+    const id = l.perfiles.nombre
+    if (!voluntarioMap.has(id)) {
+      voluntarioMap.set(id, { nombre: l.perfiles.nombre, counts: {}, total: 0 })
+    }
+    const entry = voluntarioMap.get(id)!
+    entry.counts[l.resultado] = (entry.counts[l.resultado] ?? 0) + 1
+    entry.total++
+  }
+  const porVoluntario = Array.from(voluntarioMap.values()).sort((a, b) => b.total - a.total)
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Llamadas</h1>
-        <p className="text-muted-foreground text-sm">Historial de todas las llamadas.</p>
+        <p className="text-muted-foreground text-sm">
+          {llamadas.length} llamada{llamadas.length !== 1 ? 's' : ''} registrada{llamadas.length !== 1 ? 's' : ''}
+        </p>
       </div>
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Elector</TableHead>
-              <TableHead>Voluntario</TableHead>
-              <TableHead>Resultado</TableHead>
-              <TableHead>Fecha</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {llamadas.length === 0 ? (
+
+      {/* Resultado summary cards */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {porResultado.map(({ resultado, count }) => (
+          <div key={resultado} className="rounded-lg border px-4 py-3 flex items-center justify-between">
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">{RESULTADO_LABELS[resultado]}</p>
+              <p className="text-2xl font-bold tabular-nums">{count}</p>
+            </div>
+            <Badge variant={RESULTADO_VARIANT[resultado] ?? 'secondary'} className="shrink-0">
+              {llamadas.length > 0 ? `${Math.round((count / llamadas.length) * 100)}%` : '0%'}
+            </Badge>
+          </div>
+        ))}
+      </div>
+
+      {/* Per-voluntario breakdown */}
+      {porVoluntario.length > 0 && (
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                  No hay llamadas registradas.
-                </TableCell>
+                <TableHead>Voluntario</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+                {RESULTADOS.map((r) => (
+                  <TableHead key={r} className="text-right hidden sm:table-cell">
+                    {RESULTADO_LABELS[r]}
+                  </TableHead>
+                ))}
               </TableRow>
-            ) : (
-              llamadas.map((l) => (
-                <TableRow key={l.id}>
-                  <TableCell className="font-medium">{l.electores.personas.nombre}</TableCell>
-                  <TableCell className="text-muted-foreground">{l.perfiles.nombre}</TableCell>
-                  <TableCell>
-                    <Badge variant={RESULTADO_VARIANT[l.resultado] ?? 'secondary'}>
-                      {RESULTADO_LABELS[l.resultado] ?? l.resultado}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
-                    {new Date(l.fecha).toLocaleDateString('es-UY')}
+            </TableHeader>
+            <TableBody>
+              {porVoluntario.map((v) => (
+                <TableRow key={v.nombre}>
+                  <TableCell className="font-medium">{v.nombre}</TableCell>
+                  <TableCell className="text-right tabular-nums">{v.total}</TableCell>
+                  {RESULTADOS.map((r) => (
+                    <TableCell key={r} className="text-right tabular-nums hidden sm:table-cell text-muted-foreground">
+                      {v.counts[r] ?? 0}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {/* Full history */}
+      <div>
+        <h2 className="text-sm font-medium text-muted-foreground mb-2">Historial completo</h2>
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Elector</TableHead>
+                <TableHead>Voluntario</TableHead>
+                <TableHead>Resultado</TableHead>
+                <TableHead>Fecha</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {llamadas.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                    No hay llamadas registradas.
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+              ) : (
+                llamadas.map((l) => (
+                  <TableRow key={l.id}>
+                    <TableCell className="font-medium">{l.electores.personas.nombre}</TableCell>
+                    <TableCell className="text-muted-foreground">{l.perfiles.nombre}</TableCell>
+                    <TableCell>
+                      <Badge variant={RESULTADO_VARIANT[l.resultado] ?? 'secondary'}>
+                        {RESULTADO_LABELS[l.resultado] ?? l.resultado}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {new Date(l.fecha).toLocaleDateString('es-UY')}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
     </div>
   )

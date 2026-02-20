@@ -178,20 +178,34 @@ Usuarios de la app (extends Supabase Auth).
 ## Páginas / Vistas
 
 ### Home / Dashboard
-- KPI cards (llamadas hoy, llamadas totales, % electores contactados, % aceptaron)
+- KPI cards: Total Electores, Total Llamadas, Confirmados (Aceptaron), Tasa de Aceptación (Confirmados / Total)
+- **Admin:** tabla de progreso por voluntario — asignados, llamadas realizadas, confirmados, tasa de conversión (color-coded)
 - Lista de próximos eventos (los 5 próximos, ordenados por fecha+hora)
 
 ### Electores
-- **Admin:** Tabla completa con búsqueda, filtros por estado, export Excel
+- **Admin:** Tabla completa con búsqueda, filtro por estado, filtro "Sin asignar" (toggle), export CSV, import Excel
+- **Admin — columnas:** Nombre, Edad (calculada desde fecha_nacimiento), Nro Socio, Celular, Estado (badge), Asignado a
+- **Admin — acciones masivas (checkboxes):** selección por página con patrón Gmail (banner para seleccionar todos los N resultados), asignación masiva a voluntario, cambio masivo de estado
 - **Voluntario:** Solo ve los asignados (nombre + celular)
-- Import desde Excel (Admin)
-- Click en elector → detalle con historial de llamadas
+- Click en elector → detalle (ver sección Detalle de Elector)
+
+### Detalle de Elector (`/electores/[id]`)
+- Header: nombre como h1 + badge de estado + "Asignado a X" (si aplica)
+- Botón "Editar" (Admin) → abre ElectorFormDialog inline
+- Botón "Iniciar llamada" → navega a `/llamadas/flow/[id]`
+- Card Información Personal: Cédula, Nro Socio, Celular, Teléfono, Email, Dirección, Fecha de nacimiento (formateada + edad en paréntesis); campos vacíos ocultos
+- Card Estado: estado (badge), asignado a, notas
+- Historial de llamadas: resultado (badge con label legible), voluntario que llamó, fecha formateada
 
 ### Flow de Llamada
 - Voluntario selecciona elector → inicia flow
 - Una pregunta a la vez, branching automático por reglas_flow
 - Al finalizar: registra resultado y actualiza estado del elector
 - Admin ve el historial completo de respuestas por elector
+
+### Llamadas
+- **Voluntario:** tabla de electores asignados con filtro de estado (Para llamar = Pendiente+Llamado por defecto; también: Todos, Confirmado, Para Enviar, Lista Enviada, Número Incorrecto, Descartado). Contador de pendientes y sin atender.
+- **Admin:** 4 tarjetas resumen (count + % por cada resultado: Nos vota, No nos vota, No atendió, Número incorrecto) + tabla de desglose por voluntario (total + columna por resultado) + historial completo
 
 ### Configuración del Flow (Admin)
 - CRUD de preguntas
@@ -250,7 +264,7 @@ Usuarios de la app (extends Supabase Auth).
 4. Confirma → insert batch
 
 Disponible para:
-- **Electores:** inserta en `personas` + `electores` (upsert por cédula)
+- **Electores:** upsert en `personas` (por `nro_socio` primero, fallback a `cédula`) + inserta en `electores`. Optimizado para archivos grandes: lookups en chunks de 400, inserts en chunks de 500. Body limit 10MB.
 - **Personas de la Lista:** upsert en `personas` (por cédula)
 - **Integrantes de la Lista:** inserta en `roles_lista` (persona debe existir; busca por cédula o nombre exacto)
 
@@ -290,26 +304,37 @@ src/
 │       ├── page.tsx              # Home/Dashboard
 │       ├── electores/
 │       │   ├── page.tsx          # Lista
-│       │   └── [id]/page.tsx     # Detalle
+│       │   ├── data-table.tsx    # Client component: tabla, filtros, bulk actions
+│       │   ├── elector-form.tsx  # Dialog crear/editar elector
+│       │   └── [id]/
+│       │       ├── page.tsx      # Detalle del elector
+│       │       └── actions.tsx   # Client wrapper para Edit dialog en detalle
+│       │   └── import/           # Import Excel
 │       ├── llamadas/
 │       │   ├── page.tsx
+│       │   ├── llamadas-client.tsx  # VoluntarioView + AdminView (stats + historial)
 │       │   └── flow/[electorId]/page.tsx
 │       ├── flow-config/          # Admin: configurar preguntas
 │       ├── lista/                # Integrantes de la lista
 │       ├── personas-lista/       # Datos personales de integrantes
 │       ├── campanas/             # Email campaigns (stub)
-│       ├── cartas/               # Carta personalizada + PDF (stub)
+│       ├── cartas/               # Envío de cartas físicas
 │       ├── gastos/
 │       ├── eventos/
 │       └── usuarios/
 ├── components/
 │   ├── ui/                       # shadcn components (no editar)
+│   ├── confirm-dialog.tsx        # Diálogo de confirmación reutilizable
 │   └── export-dialog.tsx         # Componente reutilizable de export Excel
 ├── lib/
 │   ├── actions/                  # Server Actions (mutations)
+│   │   ├── electores.ts          # getElectores, CRUD, asignarEnMasa, cambiarEstadoEnMasa
+│   │   ├── llamadas.ts           # getElectoresParaLlamar, getAllLlamadas, submitLlamada
+│   │   ├── import-electores.ts   # previewImport, importElectores (bulk, chunked)
+│   │   └── ...
 │   ├── supabase/                 # Clientes server/client
 │   ├── validations/              # Zod schemas
-│   └── constants/
+│   └── csv-export.ts             # Export CSV de electores
 └── types/
     └── database.ts               # Tipos e interfaces de DB (fuente de verdad)
 ```
@@ -318,10 +343,15 @@ src/
 
 ## Estado de Desarrollo
 1. ✅ Setup: Supabase + Vercel + Auth + RLS
-2. ✅ Personas + Electores: CRUD + Import Excel
+2. ✅ Personas + Electores: CRUD + Import Excel (bulk, chunked, upsert por nro_socio)
 3. ✅ Flow de Llamada: preguntas, reglas, motor, registro
-4. ✅ Dashboard: KPIs + próximos eventos
+4. ✅ Dashboard: KPIs + tabla de progreso por voluntario + próximos eventos
 5. ✅ Integrantes Lista + Personas de la Lista
 6. ✅ Gastos + Eventos
-7. ⏳ Campañas Email + Carta PDF (stubs)
-8. ✅ Export Excel + Import para Lista/Personas Lista
+7. ⏳ Campañas Email (stub) · Carta PDF (stub)
+8. ✅ Export CSV + Import Excel para Lista/Personas Lista
+9. ✅ Electores: acciones masivas (asignar voluntario, cambiar estado, select-all Gmail pattern)
+10. ✅ Electores: filtro "Sin asignar" + columna Edad
+11. ✅ Detalle de elector: edición inline, llamadas con voluntario y resultado, edad formateada
+12. ✅ Llamadas admin: tarjetas por resultado + desglose por voluntario
+13. ✅ Llamadas voluntario: filtro de estado configurable
