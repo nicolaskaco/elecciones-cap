@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getRequiredPerfil } from '@/lib/auth'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Users, Phone, CheckCircle, TrendingUp, Calendar, MapPin, Clock } from 'lucide-react'
 import type { Evento } from '@/types/database'
 
@@ -23,6 +24,33 @@ async function getKPIs() {
   const tasa = totalElectores > 0 ? Math.round((electoresAceptaron / totalElectores) * 100) : 0
 
   return { totalElectores, totalLlamadas, electoresAceptaron, tasa }
+}
+
+async function getVoluntariosStats() {
+  const supabase = await createClient()
+
+  const { data: voluntarios } = await supabase
+    .from('perfiles')
+    .select('id, nombre')
+    .eq('rol', 'Voluntario')
+    .order('nombre')
+
+  if (!voluntarios?.length) return []
+
+  return Promise.all(
+    voluntarios.map(async (v) => {
+      const [asignadosRes, llamadasRes, confirmadosRes] = await Promise.all([
+        supabase.from('electores').select('id', { count: 'exact', head: true }).eq('asignado_a', v.id),
+        supabase.from('llamadas').select('id', { count: 'exact', head: true }).eq('voluntario_id', v.id),
+        supabase.from('electores').select('id', { count: 'exact', head: true }).eq('asignado_a', v.id).eq('estado', 'Confirmado'),
+      ])
+      const asignados = asignadosRes.count ?? 0
+      const llamadas = llamadasRes.count ?? 0
+      const confirmados = confirmadosRes.count ?? 0
+      const tasa = asignados > 0 ? Math.round((confirmados / asignados) * 100) : 0
+      return { id: v.id, nombre: v.nombre, asignados, llamadas, confirmados, tasa }
+    })
+  )
 }
 
 async function getUpcomingEventos(): Promise<Evento[]> {
@@ -57,7 +85,14 @@ function formatFecha(fecha: string) {
 }
 
 export default async function DashboardPage() {
-  const [perfil, kpis, eventos] = await Promise.all([getRequiredPerfil(), getKPIs(), getUpcomingEventos()])
+  const perfil = await getRequiredPerfil()
+  const isAdmin = perfil.rol === 'Admin'
+
+  const [kpis, eventos, voluntariosStats] = await Promise.all([
+    getKPIs(),
+    getUpcomingEventos(),
+    isAdmin ? getVoluntariosStats() : Promise.resolve([]),
+  ])
 
   const cards = [
     {
@@ -110,6 +145,46 @@ export default async function DashboardPage() {
           )
         })}
       </div>
+
+      {isAdmin && voluntariosStats.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Voluntarios
+            </CardTitle>
+            <CardDescription>Progreso por voluntario</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nombre</TableHead>
+                  <TableHead className="text-right">Asignados</TableHead>
+                  <TableHead className="text-right">Llamadas</TableHead>
+                  <TableHead className="text-right">Confirmados</TableHead>
+                  <TableHead className="text-right">Tasa</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {voluntariosStats.map((v) => (
+                  <TableRow key={v.id}>
+                    <TableCell className="font-medium">{v.nombre}</TableCell>
+                    <TableCell className="text-right tabular-nums">{v.asignados}</TableCell>
+                    <TableCell className="text-right tabular-nums">{v.llamadas}</TableCell>
+                    <TableCell className="text-right tabular-nums">{v.confirmados}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      <span className={v.tasa >= 50 ? 'text-green-600 font-medium' : v.tasa > 0 ? 'text-yellow-600' : 'text-muted-foreground'}>
+                        {v.asignados > 0 ? `${v.tasa}%` : '—'}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
