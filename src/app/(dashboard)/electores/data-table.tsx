@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Search, Download, Upload, Plus, Trash2, UserCheck } from 'lucide-react'
+import { Search, Download, Upload, Plus, Trash2, UserCheck, ListChecks } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,10 +24,10 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import type { ElectorConPersona } from '@/types/database'
+import type { ElectorConPersona, ElectorEstado } from '@/types/database'
 import { ELECTOR_ESTADOS } from '@/lib/validations/elector'
 import { exportElectoresToCSV } from '@/lib/csv-export'
-import { deleteElector, asignarElectoresEnMasa } from '@/lib/actions/electores'
+import { deleteElector, asignarElectoresEnMasa, cambiarEstadoEnMasa } from '@/lib/actions/electores'
 import { ElectorFormDialog } from './elector-form'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 
@@ -70,14 +70,17 @@ export function ElectoresDataTable({ electores, isAdmin, voluntarios }: Props) {
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null)
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [assignVoluntarioId, setAssignVoluntarioId] = useState<string>('')
+  const [bulkEstado, setBulkEstado] = useState<string>('')
   const [isPending, startTransition] = useTransition()
 
   const totalPages = Math.ceil(electores.length / PAGE_SIZE)
   const paged = electores.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
   const allIds = electores.map((e) => e.id)
-  const allSelected = allIds.length > 0 && allIds.every((id) => selected.has(id))
-  const someSelected = !allSelected && allIds.some((id) => selected.has(id))
+  const pagedIds = paged.map((e) => e.id)
+  const allPageSelected = pagedIds.length > 0 && pagedIds.every((id) => selected.has(id))
+  const somePageSelected = !allPageSelected && pagedIds.some((id) => selected.has(id))
+  const allResultsSelected = allIds.length > 0 && allIds.every((id) => selected.has(id))
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault()
@@ -130,11 +133,15 @@ export function ElectoresDataTable({ electores, isAdmin, voluntarios }: Props) {
   }
 
   function toggleSelectAll() {
-    if (allSelected) {
+    if (allPageSelected) {
       setSelected(new Set())
     } else {
-      setSelected(new Set(allIds))
+      setSelected(new Set(pagedIds))
     }
+  }
+
+  function selectAllResults() {
+    setSelected(new Set(allIds))
   }
 
   function toggleRow(id: number) {
@@ -149,6 +156,7 @@ export function ElectoresDataTable({ electores, isAdmin, voluntarios }: Props) {
   function handleCancelSelection() {
     setSelected(new Set())
     setAssignVoluntarioId('')
+    setBulkEstado('')
   }
 
   function handleApplyAssign() {
@@ -164,6 +172,21 @@ export function ElectoresDataTable({ electores, isAdmin, voluntarios }: Props) {
         router.refresh()
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Error al asignar')
+      }
+    })
+  }
+
+  function handleApplyEstado() {
+    if (!bulkEstado) return
+    startTransition(async () => {
+      try {
+        await cambiarEstadoEnMasa(Array.from(selected), bulkEstado as ElectorEstado)
+        toast.success(`${selected.size} elector${selected.size !== 1 ? 'es' : ''} actualizado${selected.size !== 1 ? 's' : ''}`)
+        setSelected(new Set())
+        setBulkEstado('')
+        router.refresh()
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Error al cambiar estado')
       }
     })
   }
@@ -236,32 +259,82 @@ export function ElectoresDataTable({ electores, isAdmin, voluntarios }: Props) {
         </div>
       </div>
 
-      {/* Bulk assignment toolbar */}
+      {/* Bulk actions toolbar */}
       {isAdmin && selected.size > 0 && (
-        <div className="flex items-center gap-3 rounded-md border bg-muted/50 px-4 py-2">
-          <UserCheck className="h-4 w-4 text-muted-foreground shrink-0" />
-          <span className="text-sm font-medium">{selected.size} seleccionado{selected.size !== 1 ? 's' : ''}</span>
+        <div className="flex flex-wrap items-center gap-3 rounded-md border bg-muted/50 px-4 py-2">
+          <span className="text-sm font-medium shrink-0">{selected.size} seleccionado{selected.size !== 1 ? 's' : ''}</span>
           <span className="text-muted-foreground text-sm">·</span>
-          <span className="text-sm text-muted-foreground">Asignar a:</span>
-          <Select value={assignVoluntarioId} onValueChange={setAssignVoluntarioId}>
-            <SelectTrigger className="w-[180px] h-8">
-              <SelectValue placeholder="Elegir voluntario" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__none__">Sin asignar</SelectItem>
-              {voluntarios.map((v) => (
-                <SelectItem key={v.id} value={v.id}>
-                  {v.nombre}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button size="sm" disabled={isPending} onClick={handleApplyAssign}>
-            Aplicar
-          </Button>
+
+          <div className="flex items-center gap-2">
+            <UserCheck className="h-4 w-4 text-muted-foreground shrink-0" />
+            <Select value={assignVoluntarioId} onValueChange={setAssignVoluntarioId}>
+              <SelectTrigger className="w-[170px] h-8">
+                <SelectValue placeholder="Asignar a..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Sin asignar</SelectItem>
+                {voluntarios.map((v) => (
+                  <SelectItem key={v.id} value={v.id}>
+                    {v.nombre}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button size="sm" disabled={isPending || !assignVoluntarioId} onClick={handleApplyAssign}>
+              Aplicar
+            </Button>
+          </div>
+
+          <span className="text-muted-foreground text-sm">·</span>
+
+          <div className="flex items-center gap-2">
+            <ListChecks className="h-4 w-4 text-muted-foreground shrink-0" />
+            <Select value={bulkEstado} onValueChange={setBulkEstado}>
+              <SelectTrigger className="w-[160px] h-8">
+                <SelectValue placeholder="Cambiar estado..." />
+              </SelectTrigger>
+              <SelectContent>
+                {ELECTOR_ESTADOS.map((e) => (
+                  <SelectItem key={e} value={e}>
+                    {e.replace(/_/g, ' ')}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button size="sm" disabled={isPending || !bulkEstado} onClick={handleApplyEstado}>
+              Aplicar
+            </Button>
+          </div>
+
           <Button size="sm" variant="ghost" onClick={handleCancelSelection}>
             Cancelar
           </Button>
+        </div>
+      )}
+
+      {/* Select all results banner (Gmail pattern) */}
+      {isAdmin && allPageSelected && !allResultsSelected && electores.length > PAGE_SIZE && (
+        <div className="flex items-center justify-center gap-2 rounded-md border bg-muted/30 px-4 py-2 text-sm">
+          <span>Seleccionaste {pagedIds.length} registros de esta página.</span>
+          <button
+            type="button"
+            className="font-medium text-primary underline-offset-4 hover:underline"
+            onClick={selectAllResults}
+          >
+            Seleccionar todos los {electores.length} resultados
+          </button>
+        </div>
+      )}
+      {isAdmin && allResultsSelected && electores.length > PAGE_SIZE && (
+        <div className="flex items-center justify-center gap-2 rounded-md border bg-primary/10 px-4 py-2 text-sm">
+          <span>Todos los <span className="font-medium">{electores.length}</span> resultados están seleccionados.</span>
+          <button
+            type="button"
+            className="font-medium text-primary underline-offset-4 hover:underline"
+            onClick={() => setSelected(new Set())}
+          >
+            Limpiar selección
+          </button>
         </div>
       )}
 
@@ -272,7 +345,7 @@ export function ElectoresDataTable({ electores, isAdmin, voluntarios }: Props) {
               {isAdmin && (
                 <TableHead className="w-[40px]">
                   <Checkbox
-                    checked={allSelected ? true : someSelected ? 'indeterminate' : false}
+                    checked={allPageSelected ? true : somePageSelected ? 'indeterminate' : false}
                     onCheckedChange={toggleSelectAll}
                     aria-label="Seleccionar todos"
                   />
