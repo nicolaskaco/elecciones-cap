@@ -37,7 +37,7 @@ export async function getElectores(opts?: {
 
   if (opts?.search) {
     query = query.or(
-      `nombre.ilike.%${opts.search}%,cedula.ilike.%${opts.search}%,nro_socio.ilike.%${opts.search}%,celular.ilike.%${opts.search}%`,
+      `nombre.ilike.%${opts.search}%,nro_socio.ilike.%${opts.search}%`,
       { referencedTable: 'personas' }
     )
   }
