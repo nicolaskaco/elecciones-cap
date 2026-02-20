@@ -76,11 +76,17 @@ const ESTADO_COLORS: Record<string, string> = {
 
 async function getEstadoBreakdown() {
   const supabase = await createClient()
-  const { data } = await supabase.from('electores').select('estado')
-  const rows = data ?? []
-  const total = rows.length
-  const counts = Object.fromEntries(ESTADO_ORDER.map((e) => [e, 0])) as Record<string, number>
-  for (const r of rows) counts[r.estado] = (counts[r.estado] ?? 0) + 1
+  const results = await Promise.all(
+    ESTADO_ORDER.map(async (estado) => {
+      const { count } = await supabase
+        .from('electores')
+        .select('id', { count: 'exact', head: true })
+        .eq('estado', estado)
+      return [estado, count ?? 0] as const
+    })
+  )
+  const counts = Object.fromEntries(results) as Record<string, number>
+  const total = Object.values(counts).reduce((a, b) => a + b, 0)
   return { total, counts }
 }
 
