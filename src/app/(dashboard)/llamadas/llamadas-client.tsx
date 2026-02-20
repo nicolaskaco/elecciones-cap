@@ -146,7 +146,12 @@ interface AdminViewProps {
   llamadas: LlamadaConDetalles[]
 }
 
+const HISTORY_PAGE_SIZE = 50
+
 export function AdminView({ llamadas }: AdminViewProps) {
+  const [historyPage, setHistoryPage] = useState(0)
+  const [resultadoFilter, setResultadoFilter] = useState<string>('all')
+
   // Aggregate by resultado
   const porResultado = RESULTADOS.map((r) => ({
     resultado: r,
@@ -165,6 +170,18 @@ export function AdminView({ llamadas }: AdminViewProps) {
     entry.total++
   }
   const porVoluntario = Array.from(voluntarioMap.values()).sort((a, b) => b.total - a.total)
+
+  // History with filter + pagination
+  const filtered = resultadoFilter === 'all'
+    ? llamadas
+    : llamadas.filter((l) => l.resultado === resultadoFilter)
+  const totalPages = Math.ceil(filtered.length / HISTORY_PAGE_SIZE)
+  const paged = filtered.slice(historyPage * HISTORY_PAGE_SIZE, (historyPage + 1) * HISTORY_PAGE_SIZE)
+
+  function handleResultadoFilter(value: string) {
+    setResultadoFilter(value)
+    setHistoryPage(0)
+  }
 
   return (
     <div className="space-y-6">
@@ -223,8 +240,22 @@ export function AdminView({ llamadas }: AdminViewProps) {
       )}
 
       {/* Full history */}
-      <div>
-        <h2 className="text-sm font-medium text-muted-foreground mb-2">Historial completo</h2>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-medium text-muted-foreground">Historial completo</h2>
+          <Select value={resultadoFilter} onValueChange={handleResultadoFilter}>
+            <SelectTrigger className="w-[180px] h-8">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los resultados</SelectItem>
+              {RESULTADOS.map((r) => (
+                <SelectItem key={r} value={r}>{RESULTADO_LABELS[r]}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         <div className="rounded-md border">
           <Table>
             <TableHeader>
@@ -236,14 +267,14 @@ export function AdminView({ llamadas }: AdminViewProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {llamadas.length === 0 ? (
+              {paged.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
                     No hay llamadas registradas.
                   </TableCell>
                 </TableRow>
               ) : (
-                llamadas.map((l) => (
+                paged.map((l) => (
                   <TableRow key={l.id}>
                     <TableCell className="font-medium">{l.electores.personas.nombre}</TableCell>
                     <TableCell className="text-muted-foreground">{l.perfiles.nombre}</TableCell>
@@ -261,6 +292,22 @@ export function AdminView({ llamadas }: AdminViewProps) {
             </TableBody>
           </Table>
         </div>
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              Mostrando {historyPage * HISTORY_PAGE_SIZE + 1}–{Math.min((historyPage + 1) * HISTORY_PAGE_SIZE, filtered.length)} de {filtered.length}
+            </p>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" disabled={historyPage === 0} onClick={() => setHistoryPage((p) => p - 1)}>
+                Anterior
+              </Button>
+              <Button variant="outline" size="sm" disabled={historyPage >= totalPages - 1} onClick={() => setHistoryPage((p) => p + 1)}>
+                Siguiente
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
