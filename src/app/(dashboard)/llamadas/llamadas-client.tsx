@@ -149,6 +149,14 @@ interface AdminViewProps {
 
 const HISTORY_PAGE_SIZE = 50
 
+function toLocalDateStr(dateStr: string): string {
+  const d = new Date(dateStr)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 export function AdminView({ llamadas }: AdminViewProps) {
   const [historyPage, setHistoryPage] = useState(0)
   const [resultadoFilter, setResultadoFilter] = useState<string>('all')
@@ -177,8 +185,8 @@ export function AdminView({ llamadas }: AdminViewProps) {
   // History with filter + pagination
   const filtered = llamadas.filter((l) => {
     if (resultadoFilter !== 'all' && l.resultado !== resultadoFilter) return false
-    if (dateFrom && l.fecha.slice(0, 10) < dateFrom) return false
-    if (dateTo && l.fecha.slice(0, 10) > dateTo) return false
+    if (dateFrom && toLocalDateStr(l.fecha) < dateFrom) return false
+    if (dateTo && toLocalDateStr(l.fecha) > dateTo) return false
     return true
   })
   const totalPages = Math.ceil(filtered.length / HISTORY_PAGE_SIZE)
