@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import type { ElectorConPersona, ElectorEstado, LlamadaConDetalles } from '@/types/database'
 import { RESULTADO_LABELS } from '@/lib/validations/llamada'
 import { Phone } from 'lucide-react'
@@ -148,9 +149,19 @@ interface AdminViewProps {
 
 const HISTORY_PAGE_SIZE = 50
 
+function toLocalDateStr(dateStr: string): string {
+  const d = new Date(dateStr)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 export function AdminView({ llamadas }: AdminViewProps) {
   const [historyPage, setHistoryPage] = useState(0)
   const [resultadoFilter, setResultadoFilter] = useState<string>('all')
+  const [dateFrom, setDateFrom] = useState<string>('')
+  const [dateTo, setDateTo] = useState<string>('')
 
   // Aggregate by resultado
   const porResultado = RESULTADOS.map((r) => ({
@@ -172,9 +183,12 @@ export function AdminView({ llamadas }: AdminViewProps) {
   const porVoluntario = Array.from(voluntarioMap.values()).sort((a, b) => b.total - a.total)
 
   // History with filter + pagination
-  const filtered = resultadoFilter === 'all'
-    ? llamadas
-    : llamadas.filter((l) => l.resultado === resultadoFilter)
+  const filtered = llamadas.filter((l) => {
+    if (resultadoFilter !== 'all' && l.resultado !== resultadoFilter) return false
+    if (dateFrom && toLocalDateStr(l.fecha) < dateFrom) return false
+    if (dateTo && toLocalDateStr(l.fecha) > dateTo) return false
+    return true
+  })
   const totalPages = Math.ceil(filtered.length / HISTORY_PAGE_SIZE)
   const paged = filtered.slice(historyPage * HISTORY_PAGE_SIZE, (historyPage + 1) * HISTORY_PAGE_SIZE)
 
@@ -182,6 +196,9 @@ export function AdminView({ llamadas }: AdminViewProps) {
     setResultadoFilter(value)
     setHistoryPage(0)
   }
+
+  function handleDateFrom(value: string) { setDateFrom(value); setHistoryPage(0) }
+  function handleDateTo(value: string)   { setDateTo(value);   setHistoryPage(0) }
 
   return (
     <div className="space-y-6">
@@ -241,8 +258,21 @@ export function AdminView({ llamadas }: AdminViewProps) {
 
       {/* Full history */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-medium text-muted-foreground">Historial completo</h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-sm font-medium text-muted-foreground mr-auto">Historial completo</h2>
+          <Input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => handleDateFrom(e.target.value)}
+            className="w-[150px] h-8"
+          />
+          <span className="text-muted-foreground text-sm">–</span>
+          <Input
+            type="date"
+            value={dateTo}
+            onChange={(e) => handleDateTo(e.target.value)}
+            className="w-[150px] h-8"
+          />
           <Select value={resultadoFilter} onValueChange={handleResultadoFilter}>
             <SelectTrigger className="w-[180px] h-8">
               <SelectValue />
