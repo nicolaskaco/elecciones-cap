@@ -177,8 +177,8 @@ export function AdminView({ llamadas }: AdminViewProps) {
   // History with filter + pagination
   const filtered = llamadas.filter((l) => {
     if (resultadoFilter !== 'all' && l.resultado !== resultadoFilter) return false
-    if (dateFrom && l.fecha < dateFrom) return false
-    if (dateTo && l.fecha > dateTo) return false
+    if (dateFrom && l.fecha.slice(0, 10) < dateFrom) return false
+    if (dateTo && l.fecha.slice(0, 10) > dateTo) return false
     return true
   })
   const totalPages = Math.ceil(filtered.length / HISTORY_PAGE_SIZE)
