@@ -35,10 +35,29 @@ WHERE e.persona_id = p.id;
 ALTER TABLE electores ALTER COLUMN nombre SET NOT NULL;
 
 -- ============================================================
--- 4. Drop the FK constraint and persona_id column
+-- 4. Drop RLS policies on comisiones_interes that reference
+--    electores.persona_id, then drop the FK and column
 -- ============================================================
+DROP POLICY IF EXISTS "comisiones_select" ON comisiones_interes;
+DROP POLICY IF EXISTS "comisiones_write"  ON comisiones_interes;
+DROP POLICY IF EXISTS "comisiones_delete" ON comisiones_interes;
+DROP POLICY IF EXISTS "comisiones_insert" ON comisiones_interes;
+
 ALTER TABLE electores DROP CONSTRAINT electores_persona_id_fkey;
 ALTER TABLE electores DROP COLUMN persona_id;
+
+-- Recreate comisiones_interes policies scoped to Lista domain (Admin only)
+CREATE POLICY "comisiones_select"
+  ON comisiones_interes FOR SELECT
+  USING (get_user_rol() = 'Admin');
+
+CREATE POLICY "comisiones_write"
+  ON comisiones_interes FOR INSERT
+  WITH CHECK (get_user_rol() = 'Admin');
+
+CREATE POLICY "comisiones_delete"
+  ON comisiones_interes FOR DELETE
+  USING (get_user_rol() = 'Admin');
 
 -- ============================================================
 -- 5. Unique index on nro_socio for import upserts
