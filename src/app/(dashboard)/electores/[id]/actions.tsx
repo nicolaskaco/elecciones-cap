@@ -8,10 +8,10 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ElectorFormDialog } from '../elector-form'
 import { updateNotas } from '@/lib/actions/electores'
-import type { ElectorConPersona } from '@/types/database'
+import type { Elector } from '@/types/database'
 
 interface Props {
-  elector: ElectorConPersona
+  elector: Elector
   voluntarios: { id: string; nombre: string }[]
 }
 

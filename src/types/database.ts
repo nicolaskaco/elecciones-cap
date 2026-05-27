@@ -60,17 +60,20 @@ export interface Persona {
 
 export interface Elector {
   id: number
-  persona_id: number
+  nombre: string
+  cedula: string | null
+  nro_socio: string | null
+  fecha_nacimiento: string | null
+  telefono: string | null
+  celular: string | null
+  email: string | null
+  direccion: string | null
   estado: ElectorEstado
   notas: string | null
   asignado_a: string | null
   enviar_lista: boolean
   created_at: string
   updated_at: string
-}
-
-export interface ElectorConPersona extends Elector {
-  personas: Persona
 }
 
 export interface RolLista {
@@ -169,7 +172,7 @@ export interface PreguntaConReglas extends PreguntaFlow {
 }
 
 export interface LlamadaConDetalles extends Llamada {
-  electores: { personas: { nombre: string } }
+  electores: { nombre: string }
   perfiles: { nombre: string }
 }
 

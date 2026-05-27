@@ -24,7 +24,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import type { ElectorConPersona, ElectorEstado } from '@/types/database'
+import type { Elector, ElectorEstado } from '@/types/database'
 import { ELECTOR_ESTADOS } from '@/lib/validations/elector'
 import { exportElectoresToCSV } from '@/lib/csv-export'
 import { deleteElector, asignarElectoresEnMasa, cambiarEstadoEnMasa } from '@/lib/actions/electores'
@@ -54,7 +54,7 @@ function calcEdad(fechaNacimiento: string | null | undefined): string {
 }
 
 interface Props {
-  electores: ElectorConPersona[]
+  electores: Elector[]
   isAdmin: boolean
   voluntarios: { id: string; nombre: string }[]
 }
@@ -65,7 +65,7 @@ export function ElectoresDataTable({ electores, isAdmin, voluntarios }: Props) {
   const [search, setSearch] = useState(searchParams.get('search') ?? '')
   const [page, setPage] = useState(0)
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingElector, setEditingElector] = useState<ElectorConPersona | null>(null)
+  const [editingElector, setEditingElector] = useState<Elector | null>(null)
   const [deleting, setDeleting] = useState<number | null>(null)
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null)
   const [selected, setSelected] = useState<Set<number>>(new Set())
@@ -137,7 +137,7 @@ export function ElectoresDataTable({ electores, isAdmin, voluntarios }: Props) {
     }
   }
 
-  function handleEdit(elector: ElectorConPersona) {
+  function handleEdit(elector: Elector) {
     setEditingElector(elector)
     setDialogOpen(true)
   }
@@ -415,10 +415,10 @@ export function ElectoresDataTable({ electores, isAdmin, voluntarios }: Props) {
                       />
                     </TableCell>
                   )}
-                  <TableCell className="font-medium">{e.personas?.nombre ?? '-'}</TableCell>
-                  {isAdmin && <TableCell>{calcEdad(e.personas?.fecha_nacimiento)}</TableCell>}
-                  {isAdmin && <TableCell>{e.personas?.nro_socio ?? '-'}</TableCell>}
-                  <TableCell>{e.personas?.celular ?? e.personas?.telefono ?? '-'}</TableCell>
+                  <TableCell className="font-medium">{e.nombre ?? '-'}</TableCell>
+                  {isAdmin && <TableCell>{calcEdad(e.fecha_nacimiento)}</TableCell>}
+                  {isAdmin && <TableCell>{e.nro_socio ?? '-'}</TableCell>}
+                  <TableCell>{e.celular ?? e.telefono ?? '-'}</TableCell>
                   {isAdmin && (
                     <TableCell>
                       <Badge variant={estadoBadgeVariant[e.estado] ?? 'outline'}>

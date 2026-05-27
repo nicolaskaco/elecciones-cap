@@ -3,7 +3,7 @@ import { getRequiredPerfil } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { getFlowData } from '@/lib/actions/llamadas'
 import { FlowEngine } from './flow-engine'
-import type { ElectorConPersona } from '@/types/database'
+import type { Elector } from '@/types/database'
 
 interface Props {
   params: Promise<{ electorId: string }>
@@ -19,7 +19,7 @@ export default async function FlowPage({ params }: Props) {
 
   const { data: elector } = await supabase
     .from('electores')
-    .select('*, personas(*)')
+    .select('*')
     .eq('id', id)
     .single()
 
@@ -34,7 +34,7 @@ export default async function FlowPage({ params }: Props) {
 
   return (
     <FlowEngine
-      elector={elector as ElectorConPersona}
+      elector={elector as Elector}
       preguntas={preguntas}
       reglas={reglas}
     />

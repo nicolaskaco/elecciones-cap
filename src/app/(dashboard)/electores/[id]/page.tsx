@@ -77,8 +77,7 @@ export default async function ElectorDetailPage({
 
   const llamadas = llamadasRes.data ?? []
   const asignadoNombre = asignadoRes.data?.nombre ?? null
-  const persona = elector.personas
-  const edad = calcEdad(persona.fecha_nacimiento)
+  const edad = calcEdad(elector.fecha_nacimiento)
 
   return (
     <div className="space-y-6">
@@ -93,7 +92,7 @@ export default async function ElectorDetailPage({
           </Button>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold tracking-tight">{persona.nombre}</h1>
+              <h1 className="text-2xl font-bold tracking-tight">{elector.nombre}</h1>
               <Badge variant={estadoBadgeVariant[elector.estado] ?? 'outline'}>
                 {elector.estado.replace(/_/g, ' ')}
               </Badge>
@@ -123,17 +122,17 @@ export default async function ElectorDetailPage({
             <CardTitle>Información Personal</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <InfoRow label="Cédula" value={persona.cedula} />
-            <InfoRow label="Nro Socio" value={persona.nro_socio} />
-            <InfoRow label="Celular" value={persona.celular} />
-            <InfoRow label="Teléfono" value={persona.telefono} />
-            <InfoRow label="Email" value={persona.email} />
-            <InfoRow label="Dirección" value={persona.direccion} />
-            {persona.fecha_nacimiento && (
+            <InfoRow label="Cédula" value={elector.cedula} />
+            <InfoRow label="Nro Socio" value={elector.nro_socio} />
+            <InfoRow label="Celular" value={elector.celular} />
+            <InfoRow label="Teléfono" value={elector.telefono} />
+            <InfoRow label="Email" value={elector.email} />
+            <InfoRow label="Dirección" value={elector.direccion} />
+            {elector.fecha_nacimiento && (
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Fecha de Nacimiento</span>
                 <span className="text-sm font-medium">
-                  {formatFecha(persona.fecha_nacimiento)}
+                  {formatFecha(elector.fecha_nacimiento)}
                   {edad && <span className="text-muted-foreground ml-1.5">({edad})</span>}
                 </span>
               </div>

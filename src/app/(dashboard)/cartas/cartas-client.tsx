@@ -9,10 +9,10 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import { marcarCartasEnviadas } from '@/lib/actions/electores'
-import type { ElectorConPersona } from '@/types/database'
+import type { Elector } from '@/types/database'
 
 interface CartasClientProps {
-  electores: ElectorConPersona[]
+  electores: Elector[]
 }
 
 export function CartasClient({ electores }: CartasClientProps) {
@@ -113,13 +113,13 @@ export function CartasClient({ electores }: CartasClientProps) {
                     <Checkbox
                       checked={selected.has(e.id)}
                       onCheckedChange={() => toggleOne(e.id)}
-                      aria-label={`Seleccionar ${e.personas.nombre}`}
+                      aria-label={`Seleccionar ${e.nombre}`}
                     />
                   </TableCell>
-                  <TableCell className="font-medium">{e.personas.nombre}</TableCell>
-                  <TableCell className="text-muted-foreground">{e.personas.cedula ?? '—'}</TableCell>
-                  <TableCell className="text-muted-foreground max-w-[200px] truncate">{e.personas.direccion ?? '—'}</TableCell>
-                  <TableCell className="text-muted-foreground">{e.personas.celular ?? e.personas.telefono ?? '—'}</TableCell>
+                  <TableCell className="font-medium">{e.nombre}</TableCell>
+                  <TableCell className="text-muted-foreground">{e.cedula ?? '—'}</TableCell>
+                  <TableCell className="text-muted-foreground max-w-[200px] truncate">{e.direccion ?? '—'}</TableCell>
+                  <TableCell className="text-muted-foreground">{e.celular ?? e.telefono ?? '—'}</TableCell>
                 </TableRow>
               ))
             )}

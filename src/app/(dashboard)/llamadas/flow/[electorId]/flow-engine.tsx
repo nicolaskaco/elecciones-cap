@@ -21,13 +21,13 @@ import {
 } from '@/components/ui/dialog'
 import { submitLlamada, confirmEnviarLista } from '@/lib/actions/llamadas'
 import { RESULTADO_LABELS } from '@/lib/validations/llamada'
-import type { PreguntaFlow, ReglaFlow, LlamadaResultado, ElectorConPersona } from '@/types/database'
+import type { PreguntaFlow, ReglaFlow, LlamadaResultado, Elector } from '@/types/database'
 import { ArrowLeft, Phone, CheckCircle, MapPin } from 'lucide-react'
 
 type Phase = 'calling' | 'result' | 'submitting'
 
 interface FlowEngineProps {
-  elector: ElectorConPersona
+  elector: Elector
   preguntas: PreguntaFlow[]
   reglas: ReglaFlow[]
 }
@@ -109,21 +109,21 @@ export function FlowEngine({ elector, preguntas, reglas }: FlowEngineProps) {
       // Intercept enviar_lista action on 'Si'
       if (pregunta?.accion === 'enviar_lista' && valor === 'Si') {
         setPendingAnswer({ preguntaId: currentPreguntaId, valor })
-        setDireccionEdit(elector.personas.direccion ?? '')
+        setDireccionEdit(elector.direccion ?? '')
         setEnviarListaOpen(true)
         return
       }
 
       applyAnswer(currentPreguntaId, valor)
     },
-    [currentPreguntaId, preguntas, elector.personas.direccion, applyAnswer]
+    [currentPreguntaId, preguntas, elector.direccion, applyAnswer]
   )
 
   async function handleConfirmEnviarLista() {
     if (!pendingAnswer) return
     setSavingDireccion(true)
     try {
-      await confirmEnviarLista(elector.id, elector.persona_id, direccionEdit || null)
+      await confirmEnviarLista(elector.id, direccionEdit || null)
       toast.success('Dirección confirmada y sobre marcado para envío')
       setEnviarListaOpen(false)
       applyAnswer(pendingAnswer.preguntaId, pendingAnswer.valor)
@@ -171,8 +171,6 @@ export function FlowEngine({ elector, preguntas, reglas }: FlowEngineProps) {
     setPhase('result')
   }
 
-  const persona = elector.personas
-
   return (
     <>
       <div className="max-w-lg mx-auto space-y-6">
@@ -182,11 +180,11 @@ export function FlowEngine({ elector, preguntas, reglas }: FlowEngineProps) {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-xl font-bold">{persona.nombre}</h1>
-            {persona.celular && (
+            <h1 className="text-xl font-bold">{elector.nombre}</h1>
+            {elector.celular && (
               <p className="text-sm text-muted-foreground flex items-center gap-1">
                 <Phone className="h-3 w-3" />
-                {persona.celular}
+                {elector.celular}
               </p>
             )}
           </div>

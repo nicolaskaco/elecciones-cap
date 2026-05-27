@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import type { ElectorConPersona } from '@/types/database'
+import type { Elector } from '@/types/database'
 import { ELECTOR_ESTADOS } from '@/lib/validations/elector'
 import { createElector, updateElector } from '@/lib/actions/electores'
 import { toast } from 'sonner'
@@ -29,7 +29,7 @@ import { toast } from 'sonner'
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
-  elector: ElectorConPersona | null
+  elector: Elector | null
   voluntarios: { id: string; nombre: string }[]
 }
 
@@ -55,14 +55,14 @@ export function ElectorFormDialog({ open, onOpenChange, elector, voluntarios }: 
   const { register, handleSubmit, setValue, watch, reset } = useForm<FormValues>({
     values: elector
       ? {
-          nombre: elector.personas.nombre,
-          cedula: elector.personas.cedula ?? '',
-          nro_socio: elector.personas.nro_socio ?? '',
-          telefono: elector.personas.telefono ?? '',
-          celular: elector.personas.celular ?? '',
-          email: elector.personas.email ?? '',
-          direccion: elector.personas.direccion ?? '',
-          fecha_nacimiento: elector.personas.fecha_nacimiento ?? '',
+          nombre: elector.nombre,
+          cedula: elector.cedula ?? '',
+          nro_socio: elector.nro_socio ?? '',
+          telefono: elector.telefono ?? '',
+          celular: elector.celular ?? '',
+          email: elector.email ?? '',
+          direccion: elector.direccion ?? '',
+          fecha_nacimiento: elector.fecha_nacimiento ?? '',
           estado: elector.estado,
           notas: elector.notas ?? '',
           asignado_a: elector.asignado_a ?? '',
@@ -85,7 +85,7 @@ export function ElectorFormDialog({ open, onOpenChange, elector, voluntarios }: 
   async function onSubmit(data: FormValues) {
     setSaving(true)
     try {
-      const persona = {
+      const payload = {
         nombre: data.nombre,
         cedula: data.cedula || null,
         nro_socio: data.nro_socio || null,
@@ -94,17 +94,15 @@ export function ElectorFormDialog({ open, onOpenChange, elector, voluntarios }: 
         email: data.email || null,
         direccion: data.direccion || null,
         fecha_nacimiento: data.fecha_nacimiento || null,
-      }
-      const electorData = {
         estado: data.estado as typeof ELECTOR_ESTADOS[number],
         notas: data.notas || null,
         asignado_a: data.asignado_a || null,
       }
 
       if (isEditing && elector) {
-        await updateElector(elector.id, elector.persona_id, persona, electorData)
+        await updateElector(elector.id, payload)
       } else {
-        await createElector(persona, electorData)
+        await createElector(payload)
       }
 
       onOpenChange(false)
