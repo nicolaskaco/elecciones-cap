@@ -155,12 +155,10 @@ export async function getPersonasLista(): Promise<PersonaConRoles[]> {
   const { data, error } = await supabase
     .from('personas')
     .select('*, roles_lista(*)')
-    .not('roles_lista', 'is', null)
     .order('nombre')
 
   if (error) throw new Error(error.message)
-  // Filter out personas with no roles_lista entries
-  return ((data ?? []) as PersonaConRoles[]).filter(p => p.roles_lista.length > 0)
+  return (data ?? []) as PersonaConRoles[]
 }
 
 export async function updatePersona(
