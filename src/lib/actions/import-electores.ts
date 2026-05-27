@@ -30,7 +30,7 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
   return chunks
 }
 
-// Build lookup maps using chunked IN queries to avoid URL length limits
+// Build lookup maps from electores table directly (cedula/nro_socio → elector id)
 async function buildLookupMaps(supabase: Awaited<ReturnType<typeof createClient>>, rows: ImportRow[]) {
   const cedulas = Array.from(new Set(rows.map((r) => r.cedula).filter(Boolean) as string[]))
   const nroSocios = Array.from(new Set(rows.map((r) => r.nro_socio).filter(Boolean) as string[]))
@@ -38,16 +38,14 @@ async function buildLookupMaps(supabase: Awaited<ReturnType<typeof createClient>
   const byCedula = new Map<string, number>()
   const byNroSocio = new Map<string, number>()
 
-  // Chunk cedula lookups
   for (const chunk of chunkArray(cedulas, LOOKUP_CHUNK)) {
-    const { data } = await supabase.from('personas').select('id, cedula').in('cedula', chunk)
-    data?.forEach((p) => { if (p.cedula) byCedula.set(p.cedula, p.id) })
+    const { data } = await supabase.from('electores').select('id, cedula').in('cedula', chunk)
+    data?.forEach((e) => { if (e.cedula) byCedula.set(e.cedula, e.id) })
   }
 
-  // Chunk nro_socio lookups
   for (const chunk of chunkArray(nroSocios, LOOKUP_CHUNK)) {
-    const { data } = await supabase.from('personas').select('id, nro_socio').in('nro_socio', chunk)
-    data?.forEach((p) => { if (p.nro_socio) byNroSocio.set(p.nro_socio, p.id) })
+    const { data } = await supabase.from('electores').select('id, nro_socio').in('nro_socio', chunk)
+    data?.forEach((e) => { if (e.nro_socio) byNroSocio.set(e.nro_socio, e.id) })
   }
 
   return { byCedula, byNroSocio }
@@ -70,7 +68,7 @@ function deduplicateRows(rows: { row: ImportRow; i: number }[]): { row: ImportRo
   })
 }
 
-function personaPayload(row: ImportRow) {
+function electorPayload(row: ImportRow) {
   return {
     nombre: row.nombre,
     cedula: row.cedula || null,
@@ -138,86 +136,46 @@ export async function importElectores(rows: ImportRow[]): Promise<ImportResult> 
   const { byCedula, byNroSocio } = await buildLookupMaps(supabase, validRows.map((r) => r.row))
 
   const toInsertRaw: { row: ImportRow; i: number }[] = []
-  const toUpdate: { row: ImportRow; i: number; personaId: number }[] = []
+  const toUpdate: { row: ImportRow; i: number; electorId: number }[] = []
 
   for (const { row, i } of validRows) {
-    // Prioritize nro_socio lookup since most rows won't have cedula
     let existingId: number | undefined
     if (row.nro_socio) existingId = byNroSocio.get(row.nro_socio)
     if (!existingId && row.cedula) existingId = byCedula.get(row.cedula)
-    if (existingId) toUpdate.push({ row, i, personaId: existingId })
+    if (existingId) toUpdate.push({ row, i, electorId: existingId })
     else toInsertRaw.push({ row, i })
   }
 
   // Deduplicate inserts by nro_socio/cedula within the file itself
   const toInsert = deduplicateRows(toInsertRaw)
 
-  // --- Bulk insert new personas + electores in chunks of 500 ---
+  // --- Bulk insert new electores in chunks of 500 ---
   const INSERT_CHUNK = 500
   for (let c = 0; c < toInsert.length; c += INSERT_CHUNK) {
     const chunk = toInsert.slice(c, c + INSERT_CHUNK)
 
-    // Use upsert with ignoreDuplicates as safety net for any edge cases
-    const { data: newPersonas, error: insertError } = await supabase
-      .from('personas')
-      .upsert(chunk.map(({ row }) => personaPayload(row)), {
-        onConflict: 'nro_socio',
-        ignoreDuplicates: false,
-      })
-      .select('id')
+    const { error: insertError } = await supabase
+      .from('electores')
+      .insert(chunk.map(({ row }) => ({ ...electorPayload(row), estado: 'Pendiente' })))
 
-    if (insertError || !newPersonas) {
-      errors.push(`Error al insertar filas ${c + 1}-${c + chunk.length}: ${insertError?.message ?? 'Error desconocido'}`)
+    if (insertError) {
+      errors.push(`Error al insertar filas ${c + 1}-${c + chunk.length}: ${insertError.message}`)
       continue
     }
 
-    // Bulk insert electores for this chunk (skip if already exists)
-    const { data: existingElectores } = await supabase
-      .from('electores')
-      .select('persona_id')
-      .in('persona_id', newPersonas.map((p) => p.id))
-
-    const existingSet = new Set(existingElectores?.map((e) => e.persona_id) ?? [])
-    const newElectores = newPersonas.filter((p) => !existingSet.has(p.id))
-
-    if (newElectores.length > 0) {
-      await supabase
-        .from('electores')
-        .insert(newElectores.map((p) => ({ persona_id: p.id, estado: 'Pendiente' })))
-      created += newElectores.length
-    }
+    created += chunk.length
   }
 
-  // --- Update existing personas in parallel chunks of 50 ---
+  // --- Update existing electores in parallel chunks of 50 ---
   const UPDATE_CHUNK = 50
   for (let c = 0; c < toUpdate.length; c += UPDATE_CHUNK) {
     const chunk = toUpdate.slice(c, c + UPDATE_CHUNK)
     await Promise.all(
-      chunk.map(({ row, personaId }) =>
-        supabase.from('personas').update(personaPayload(row)).eq('id', personaId)
+      chunk.map(({ row, electorId }) =>
+        supabase.from('electores').update(electorPayload(row)).eq('id', electorId)
       )
     )
     updated += chunk.length
-  }
-
-  // Ensure electores exist for updated personas (chunked IN queries)
-  if (toUpdate.length > 0) {
-    const personaIds = toUpdate.map((t) => t.personaId)
-    const existingSet = new Set<number>()
-
-    for (const chunk of chunkArray(personaIds, LOOKUP_CHUNK)) {
-      const { data } = await supabase.from('electores').select('persona_id').in('persona_id', chunk)
-      data?.forEach((e) => existingSet.add(e.persona_id))
-    }
-
-    const missing = personaIds.filter((id) => !existingSet.has(id))
-    if (missing.length > 0) {
-      for (const chunk of chunkArray(missing, INSERT_CHUNK)) {
-        await supabase
-          .from('electores')
-          .insert(chunk.map((pid) => ({ persona_id: pid, estado: 'Pendiente' })))
-      }
-    }
   }
 
   revalidatePath('/electores')

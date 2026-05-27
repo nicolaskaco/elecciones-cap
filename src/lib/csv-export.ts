@@ -1,17 +1,17 @@
-import type { ElectorConPersona } from '@/types/database'
+import type { Elector } from '@/types/database'
 
-export function exportElectoresToCSV(electores: ElectorConPersona[]) {
+export function exportElectoresToCSV(electores: Elector[]) {
   const headers = ['Nombre', 'Cedula', 'Nro Socio', 'Celular', 'Telefono', 'Email', 'Estado', 'Direccion']
 
   const rows = electores.map((e) => [
-    e.personas.nombre,
-    e.personas.cedula ?? '',
-    e.personas.nro_socio ?? '',
-    e.personas.celular ?? '',
-    e.personas.telefono ?? '',
-    e.personas.email ?? '',
+    e.nombre,
+    e.cedula ?? '',
+    e.nro_socio ?? '',
+    e.celular ?? '',
+    e.telefono ?? '',
+    e.email ?? '',
     e.estado,
-    e.personas.direccion ?? '',
+    e.direccion ?? '',
   ])
 
   const csvContent = [headers, ...rows]
@@ -26,7 +26,7 @@ export function exportElectoresToCSV(electores: ElectorConPersona[]) {
     )
     .join('\n')
 
-  const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
+  const blob = new Blob(['﻿' + csvContent], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url

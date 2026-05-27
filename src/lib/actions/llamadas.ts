@@ -4,15 +4,15 @@ import { createClient } from '@/lib/supabase/server'
 import { getRequiredPerfil, requireAdmin } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 import { RESULTADO_TO_ESTADO, type SubmitLlamadaInput } from '@/lib/validations/llamada'
-import type { ElectorConPersona, LlamadaConDetalles, PreguntaFlow, ReglaFlow } from '@/types/database'
+import type { Elector, LlamadaConDetalles, PreguntaFlow, ReglaFlow } from '@/types/database'
 
-export async function getElectoresParaLlamar(): Promise<ElectorConPersona[]> {
+export async function getElectoresParaLlamar(): Promise<Elector[]> {
   const supabase = await createClient()
   const perfil = await getRequiredPerfil()
 
   let query = supabase
     .from('electores')
-    .select('*, personas(*)')
+    .select('*')
     .order('created_at', { ascending: false })
 
   if (perfil.rol === 'Voluntario') {
@@ -21,7 +21,7 @@ export async function getElectoresParaLlamar(): Promise<ElectorConPersona[]> {
 
   const { data, error } = await query
   if (error) throw new Error(error.message)
-  return (data ?? []) as ElectorConPersona[]
+  return (data ?? []) as Elector[]
 }
 
 export async function getAllLlamadas(): Promise<LlamadaConDetalles[]> {
@@ -30,7 +30,7 @@ export async function getAllLlamadas(): Promise<LlamadaConDetalles[]> {
 
   const { data, error } = await supabase
     .from('llamadas')
-    .select('*, electores(personas(nombre)), perfiles(nombre)')
+    .select('*, electores(nombre), perfiles(nombre)')
     .order('created_at', { ascending: false })
 
   if (error) throw new Error(error.message)
@@ -65,7 +65,6 @@ export async function getFlowData(): Promise<{
 
 export async function confirmEnviarLista(
   electorId: number,
-  personaId: number,
   direccion: string | null
 ): Promise<void> {
   const supabase = await createClient()
@@ -80,13 +79,12 @@ export async function confirmEnviarLista(
     if (!elector || elector.asignado_a !== perfil.id) throw new Error('Sin permiso')
   }
 
-  const [electorUpdate, personaUpdate] = await Promise.all([
-    supabase.from('electores').update({ enviar_lista: true }).eq('id', electorId),
-    supabase.from('personas').update({ direccion: direccion ?? null }).eq('id', personaId),
-  ])
+  const { error } = await supabase
+    .from('electores')
+    .update({ enviar_lista: true, direccion: direccion ?? null })
+    .eq('id', electorId)
 
-  if (electorUpdate.error) throw new Error(electorUpdate.error.message)
-  if (personaUpdate.error) throw new Error(personaUpdate.error.message)
+  if (error) throw new Error(error.message)
 
   revalidatePath('/electores')
   revalidatePath(`/electores/${electorId}`)

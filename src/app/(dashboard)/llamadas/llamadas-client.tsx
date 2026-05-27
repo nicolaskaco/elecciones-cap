@@ -20,7 +20,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import type { ElectorConPersona, ElectorEstado, LlamadaConDetalles } from '@/types/database'
+import type { Elector, ElectorEstado, LlamadaConDetalles } from '@/types/database'
 import { RESULTADO_LABELS } from '@/lib/validations/llamada'
 import { Phone } from 'lucide-react'
 
@@ -54,7 +54,7 @@ const FILTER_OPTIONS = [
 ]
 
 interface VoluntarioViewProps {
-  electores: ElectorConPersona[]
+  electores: Elector[]
 }
 
 export function VoluntarioView({ electores }: VoluntarioViewProps) {
@@ -114,9 +114,9 @@ export function VoluntarioView({ electores }: VoluntarioViewProps) {
             ) : (
               filtered.map((e) => (
                 <TableRow key={e.id}>
-                  <TableCell className="font-medium">{e.personas.nombre}</TableCell>
+                  <TableCell className="font-medium">{e.nombre}</TableCell>
                   <TableCell className="text-muted-foreground">
-                    {e.personas.celular ?? '—'}
+                    {e.celular ?? '—'}
                   </TableCell>
                   <TableCell>
                     <Badge variant={ESTADO_BADGE_VARIANT[e.estado] ?? 'outline'}>
@@ -306,7 +306,7 @@ export function AdminView({ llamadas }: AdminViewProps) {
               ) : (
                 paged.map((l) => (
                   <TableRow key={l.id}>
-                    <TableCell className="font-medium">{l.electores.personas.nombre}</TableCell>
+                    <TableCell className="font-medium">{l.electores.nombre}</TableCell>
                     <TableCell className="text-muted-foreground">{l.perfiles.nombre}</TableCell>
                     <TableCell>
                       <Badge variant={RESULTADO_VARIANT[l.resultado] ?? 'secondary'}>

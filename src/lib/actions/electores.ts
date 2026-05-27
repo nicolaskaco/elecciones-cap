@@ -3,20 +3,20 @@
 import { createClient } from '@/lib/supabase/server'
 import { getRequiredPerfil, requireAdmin } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
-import type { ElectorConPersona, ElectorEstado } from '@/types/database'
+import type { Elector, ElectorEstado } from '@/types/database'
 
 export async function getElectores(opts?: {
   search?: string
   estado?: ElectorEstado | ''
   sinAsignar?: boolean
   asignadoA?: string
-}): Promise<ElectorConPersona[]> {
+}): Promise<Elector[]> {
   const supabase = await createClient()
   const perfil = await getRequiredPerfil()
 
   let query = supabase
     .from('electores')
-    .select('*, personas!inner(*)')
+    .select('*')
     .order('created_at', { ascending: false })
 
   if (perfil.rol === 'Voluntario') {
@@ -37,31 +37,30 @@ export async function getElectores(opts?: {
 
   if (opts?.search) {
     query = query.or(
-      `nombre.ilike.%${opts.search}%,nro_socio.ilike.%${opts.search}%`,
-      { referencedTable: 'personas' }
+      `nombre.ilike.%${opts.search}%,nro_socio.ilike.%${opts.search}%`
     )
   }
 
   const { data, error } = await query
 
   if (error) throw new Error(error.message)
-  return (data ?? []) as ElectorConPersona[]
+  return (data ?? []) as Elector[]
 }
 
-export async function getElectorById(id: number): Promise<ElectorConPersona | null> {
+export async function getElectorById(id: number): Promise<Elector | null> {
   const supabase = await createClient()
 
   const { data, error } = await supabase
     .from('electores')
-    .select('*, personas!inner(*)')
+    .select('*')
     .eq('id', id)
     .single()
 
   if (error) return null
-  return data as ElectorConPersona
+  return data as Elector
 }
 
-export async function createElector(persona: {
+export async function createElector(data: {
   nombre: string
   cedula?: string | null
   nro_socio?: string | null
@@ -70,7 +69,6 @@ export async function createElector(persona: {
   email?: string | null
   direccion?: string | null
   fecha_nacimiento?: string | null
-}, elector: {
   estado?: ElectorEstado
   notas?: string | null
   asignado_a?: string | null
@@ -78,41 +76,30 @@ export async function createElector(persona: {
   await requireAdmin()
   const supabase = await createClient()
 
-  const { data: personaData, error: personaError } = await supabase
-    .from('personas')
-    .insert({
-      nombre: persona.nombre,
-      cedula: persona.cedula || null,
-      nro_socio: persona.nro_socio || null,
-      telefono: persona.telefono || null,
-      celular: persona.celular || null,
-      email: persona.email || null,
-      direccion: persona.direccion || null,
-      fecha_nacimiento: persona.fecha_nacimiento || null,
-    })
-    .select('id')
-    .single()
-
-  if (personaError) throw new Error(personaError.message)
-
-  const { error: electorError } = await supabase
+  const { error } = await supabase
     .from('electores')
     .insert({
-      persona_id: personaData.id,
-      estado: elector.estado ?? 'Pendiente',
-      notas: elector.notas || null,
-      asignado_a: elector.asignado_a || null,
+      nombre: data.nombre,
+      cedula: data.cedula || null,
+      nro_socio: data.nro_socio || null,
+      telefono: data.telefono || null,
+      celular: data.celular || null,
+      email: data.email || null,
+      direccion: data.direccion || null,
+      fecha_nacimiento: data.fecha_nacimiento || null,
+      estado: data.estado ?? 'Pendiente',
+      notas: data.notas || null,
+      asignado_a: data.asignado_a || null,
     })
 
-  if (electorError) throw new Error(electorError.message)
+  if (error) throw new Error(error.message)
 
   revalidatePath('/electores')
 }
 
 export async function updateElector(
   electorId: number,
-  personaId: number,
-  persona: {
+  data: {
     nombre: string
     cedula?: string | null
     nro_socio?: string | null
@@ -121,8 +108,6 @@ export async function updateElector(
     email?: string | null
     direccion?: string | null
     fecha_nacimiento?: string | null
-  },
-  elector: {
     estado?: ElectorEstado
     notas?: string | null
     asignado_a?: string | null
@@ -131,32 +116,24 @@ export async function updateElector(
   await requireAdmin()
   const supabase = await createClient()
 
-  const { error: personaError } = await supabase
-    .from('personas')
-    .update({
-      nombre: persona.nombre,
-      cedula: persona.cedula || null,
-      nro_socio: persona.nro_socio || null,
-      telefono: persona.telefono || null,
-      celular: persona.celular || null,
-      email: persona.email || null,
-      direccion: persona.direccion || null,
-      fecha_nacimiento: persona.fecha_nacimiento || null,
-    })
-    .eq('id', personaId)
-
-  if (personaError) throw new Error(personaError.message)
-
-  const { error: electorError } = await supabase
+  const { error } = await supabase
     .from('electores')
     .update({
-      estado: elector.estado ?? 'Pendiente',
-      notas: elector.notas || null,
-      asignado_a: elector.asignado_a || null,
+      nombre: data.nombre,
+      cedula: data.cedula || null,
+      nro_socio: data.nro_socio || null,
+      telefono: data.telefono || null,
+      celular: data.celular || null,
+      email: data.email || null,
+      direccion: data.direccion || null,
+      fecha_nacimiento: data.fecha_nacimiento || null,
+      estado: data.estado ?? 'Pendiente',
+      notas: data.notas || null,
+      asignado_a: data.asignado_a || null,
     })
     .eq('id', electorId)
 
-  if (electorError) throw new Error(electorError.message)
+  if (error) throw new Error(error.message)
 
   revalidatePath('/electores')
   revalidatePath(`/electores/${electorId}`)
@@ -166,32 +143,12 @@ export async function deleteElector(electorId: number) {
   await requireAdmin()
   const supabase = await createClient()
 
-  // Get persona_id before deleting elector
-  const { data: elector } = await supabase
-    .from('electores')
-    .select('persona_id')
-    .eq('id', electorId)
-    .single()
-
-  if (!elector) throw new Error('Elector no encontrado')
-
-  // Delete elector (cascade will handle)
-  const { error: electorError } = await supabase
+  const { error } = await supabase
     .from('electores')
     .delete()
     .eq('id', electorId)
 
-  if (electorError) throw new Error(electorError.message)
-
-  // Delete persona if not referenced by other electores
-  const { count } = await supabase
-    .from('electores')
-    .select('id', { count: 'exact', head: true })
-    .eq('persona_id', elector.persona_id)
-
-  if (count === 0) {
-    await supabase.from('personas').delete().eq('id', elector.persona_id)
-  }
+  if (error) throw new Error(error.message)
 
   revalidatePath('/electores')
 }
