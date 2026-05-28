@@ -5,4 +5,5 @@ export const ROL_LABELS: Record<RolListaTipo, string> = {
   Comision_Electoral: 'Comisión Electoral',
   Comision_Fiscal: 'Comisión Fiscal',
   Asamblea_Representativa: 'Asamblea Representativa',
+  Colaborador: 'Colaborador',
 }

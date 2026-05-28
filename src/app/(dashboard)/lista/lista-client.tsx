@@ -39,6 +39,7 @@ const ROL_BADGE_VARIANT: Record<RolListaTipo, 'default' | 'secondary' | 'outline
   Comision_Electoral: 'secondary',
   Comision_Fiscal: 'secondary',
   Asamblea_Representativa: 'outline',
+  Colaborador: 'outline',
 }
 
 const TIPO_ORDER: Record<RolListaTipo, number> = {
@@ -46,6 +47,7 @@ const TIPO_ORDER: Record<RolListaTipo, number> = {
   Comision_Electoral: 1,
   Comision_Fiscal: 2,
   Asamblea_Representativa: 3,
+  Colaborador: 4,
 }
 
 const SUFIJO_ORDER: Record<string, number> = {
