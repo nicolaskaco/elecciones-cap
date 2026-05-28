@@ -63,12 +63,16 @@ export async function inviteUsuario(input: InviteUsuarioFormData): Promise<{ inv
     }),
   })
 
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({})) as { error?: string }
+  const body = await response.json() as { error?: string; inviteUrl?: string }
+
+  if (!response.ok || body.error) {
     throw new Error(body.error ?? `Error al invitar usuario (${response.status})`)
   }
 
-  const { inviteUrl } = await response.json() as { inviteUrl: string }
+  if (!body.inviteUrl) {
+    throw new Error('No se generó el enlace de invitación')
+  }
+
   revalidatePath('/usuarios')
-  return { inviteUrl }
+  return { inviteUrl: body.inviteUrl }
 }

@@ -1,126 +1,161 @@
-import { createClient } from '@supabase/supabase-js'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-}
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+};
 
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-  })
-}
+const ok = (body: Record<string, unknown>) =>
+  new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
 
-Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: CORS_HEADERS })
-  }
-
-  if (req.method !== 'POST') {
-    return json({ error: 'Method not allowed' }, 405)
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    // 1. Extract caller JWT
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader?.startsWith('Bearer ')) {
-      return json({ error: 'Missing authorization' }, 401)
+    // ── Authenticate the caller ──────────────────────────────
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return ok({ error: "Missing authorization header" });
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const siteUrl = Deno.env.get('SITE_URL') ?? 'http://localhost:3000'
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const siteUrl = Deno.env.get("SITE_URL") || "http://localhost:3000";
 
-    // 2. Verify caller identity with their JWT
+    // Client scoped to the caller's JWT (respects RLS)
     const callerClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
-    })
+    });
 
-    const { data: { user: callerUser }, error: userError } = await callerClient.auth.getUser()
-    if (userError || !callerUser) {
-      return json({ error: 'Unauthorized' }, 401)
+    const {
+      data: { user: caller },
+      error: callerError,
+    } = await callerClient.auth.getUser();
+
+    if (callerError || !caller) {
+      return ok({
+        error:
+          "Sesión inválida. Volvé a iniciar sesión. (" +
+          (callerError?.message || "no user") +
+          ")",
+      });
     }
 
-    // 3. Confirm caller has Admin rol in perfiles (RLS lets them only see their own row)
-    const { data: perfil, error: perfilError } = await callerClient
-      .from('perfiles')
-      .select('rol')
-      .eq('id', callerUser.id)
-      .single()
+    // Admin-only client (bypasses RLS)
+    const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
-    if (perfilError || perfil?.rol !== 'Admin') {
-      return json({ error: 'Forbidden: Admin only' }, 403)
+    // Verify caller is an Admin via perfiles table
+    const { data: callerPerfil, error: perfilError } = await adminClient
+      .from("perfiles")
+      .select("rol")
+      .eq("id", caller.id)
+      .single();
+
+    if (perfilError || callerPerfil?.rol !== "Admin") {
+      return ok({
+        error:
+          "Solo administradores pueden invitar usuarios (tu email: " +
+          caller.email +
+          ", rol: " +
+          (callerPerfil?.rol || "sin perfil") +
+          ")",
+      });
     }
 
-    // 4. Parse request body
-    const body = await req.json() as {
-      email: string
-      role: 'Admin' | 'Voluntario'
-      permissions: {
-        can_manage_electores: boolean
-        can_access_gastos: boolean
-        can_access_lista: boolean
-        can_access_eventos: boolean
-        can_access_campanas: boolean
-      }
-      invitedBy: string
-    }
+    // ── Parse request body ───────────────────────────────────
+    const { email, role, permissions, invitedBy } = await req.json();
 
-    const { email, role, permissions, invitedBy } = body
     if (!email || !role) {
-      return json({ error: 'email and role are required' }, 400)
+      return ok({ error: "Email y rol son requeridos" });
     }
 
-    // 5. Admin client for privileged operations (bypasses RLS)
-    const adminClient = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    })
-
-    // 6. Generate the invite link — hashed_token is the one-time token
-    const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
-      type: 'invite',
-      email,
-      options: {
-        data: { rol: role },
-        redirectTo: `${siteUrl}/auth/set-password`,
-      },
-    })
-
-    if (linkError || !linkData?.properties?.hashed_token) {
-      console.error('generateLink error:', linkError)
-      return json({ error: 'Failed to generate invite link' }, 500)
-    }
-
-    // 7. Build hash-fragment URL so WhatsApp/Telegram crawlers can't consume the token
-    const tokenHash = linkData.properties.hashed_token
-    const inviteUrl = `${siteUrl}/auth/confirm#type=invite&token_hash=${tokenHash}`
-
-    // 8. Upsert user_permissions — non-fatal if it fails
-    const { error: permError } = await adminClient
-      .from('user_permissions')
-      .upsert({
+    // ── Generate invite link (does NOT send email) ───────────
+    const { data: linkData, error: linkError } =
+      await adminClient.auth.admin.generateLink({
+        type: "invite",
         email,
-        role,
-        can_manage_electores: permissions.can_manage_electores,
-        can_access_gastos: permissions.can_access_gastos,
-        can_access_lista: permissions.can_access_lista,
-        can_access_eventos: permissions.can_access_eventos,
-        can_access_campanas: permissions.can_access_campanas,
-        invited_at: new Date().toISOString(),
-        invited_by: invitedBy ?? null,
-        accepted_at: null,
-      }, { onConflict: 'email' })
+        options: {
+          data: { rol: role },
+          redirectTo: `${siteUrl}/auth/set-password`,
+        },
+      });
 
-    if (permError) {
-      console.error('upsert user_permissions error:', permError)
+    let inviteUrl: string | null = null;
+
+    if (linkError) {
+      // If the user already exists, skip link generation but still update permissions
+      if (!linkError.message?.includes("already been registered")) {
+        return ok({ error: "Error al generar invitación: " + linkError.message });
+      }
+    } else {
+      // Put the token in the hash fragment so WhatsApp/Telegram crawlers can't
+      // consume the one-time token before the user clicks it.
+      const hashedToken = linkData?.properties?.hashed_token;
+      if (hashedToken) {
+        inviteUrl = `${siteUrl}/auth/confirm#type=invite&token_hash=${hashedToken}`;
+      } else {
+        inviteUrl = linkData?.properties?.action_link ?? null;
+      }
     }
 
-    return json({ inviteUrl })
+    // ── Upsert user_permissions ──────────────────────────────
+    const permRow: Record<string, unknown> = {
+      email: email.toLowerCase(),
+      role,
+      can_manage_electores: permissions?.can_manage_electores ?? false,
+      can_access_gastos: permissions?.can_access_gastos ?? false,
+      can_access_lista: permissions?.can_access_lista ?? false,
+      can_access_eventos: permissions?.can_access_eventos ?? false,
+      can_access_campanas: permissions?.can_access_campanas ?? false,
+      invited_at: new Date().toISOString(),
+      invited_by: invitedBy ?? null,
+      accepted_at: null,
+    };
+
+    const { error: upsertErr } = await adminClient
+      .from("user_permissions")
+      .upsert(permRow, { onConflict: "email" });
+
+    if (upsertErr) {
+      // Fallback: try update then insert
+      const { data: existing } = await adminClient
+        .from("user_permissions")
+        .select("email")
+        .eq("email", email.toLowerCase())
+        .maybeSingle();
+
+      if (existing) {
+        const { email: _e, ...updates } = permRow;
+        const { error: updateErr } = await adminClient
+          .from("user_permissions")
+          .update(updates)
+          .eq("email", email.toLowerCase());
+        if (updateErr) {
+          return ok({ error: "Error al guardar permisos: " + updateErr.message });
+        }
+      } else {
+        const { error: insertErr } = await adminClient
+          .from("user_permissions")
+          .insert(permRow);
+        if (insertErr) {
+          return ok({ error: "Error al guardar permisos: " + insertErr.message });
+        }
+      }
+    }
+
+    return ok({
+      message: "Invitación generada correctamente",
+      inviteUrl,
+    });
   } catch (err) {
-    console.error('Unexpected error:', err)
-    return json({ error: 'Internal server error' }, 500)
+    return ok({ error: "Error inesperado: " + (err as Error).message });
   }
-})
+});
