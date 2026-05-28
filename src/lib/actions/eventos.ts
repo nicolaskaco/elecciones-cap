@@ -1,9 +1,27 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { requireAdmin } from '@/lib/auth'
+import { getRequiredPerfil, requireAdmin } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 import type { Evento, EventoConPersonas } from '@/types/database'
+
+export async function getEventosParaPersona(
+  personaId: number
+): Promise<Pick<Evento, 'id' | 'nombre' | 'fecha' | 'hora'>[]> {
+  await getRequiredPerfil()
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('evento_personas')
+    .select('eventos(id, nombre, fecha, hora)')
+    .eq('persona_id', personaId)
+    .order('eventos(fecha)', { ascending: true })
+
+  if (error) throw new Error(error.message)
+  type Row = { eventos: Pick<Evento, 'id' | 'nombre' | 'fecha' | 'hora'> | Pick<Evento, 'id' | 'nombre' | 'fecha' | 'hora'>[] | null }
+  return ((data ?? []) as unknown as Row[])
+    .flatMap(row => (Array.isArray(row.eventos) ? row.eventos : row.eventos ? [row.eventos] : []))
+}
 
 export async function getEventos(): Promise<Evento[]> {
   await requireAdmin()
