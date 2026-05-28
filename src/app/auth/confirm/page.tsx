@@ -1,13 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 type Status = 'verifying' | 'success' | 'error'
 
 export default function AuthConfirmPage() {
-  const router = useRouter()
   const [status, setStatus] = useState<Status>('verifying')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
@@ -42,13 +40,15 @@ export default function AuthConfirmPage() {
 
         if (data.session) {
           setStatus('success')
-          router.replace('/auth/set-password')
+          // Hard redirect so the browser sends the new session cookies with the
+          // next request before the Supabase client on set-password initialises.
+          window.location.href = '/auth/set-password'
         } else {
           setStatus('error')
           setErrorMsg('No se pudo establecer la sesión. Intentá de nuevo.')
         }
       })
-  }, [router])
+  }, [])
 
   if (status === 'verifying') {
     return (
