@@ -162,7 +162,7 @@ export function EventoFormDialog({ open, onOpenChange, evento, personasTodas }: 
 
               {/* Personas section */}
               <div className="space-y-2">
-                <FormLabel>Personas</FormLabel>
+                <p className="text-sm font-medium leading-none">Personas</p>
                 {selectedPersonas.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 pb-1">
                     {selectedPersonas.map(p => (
