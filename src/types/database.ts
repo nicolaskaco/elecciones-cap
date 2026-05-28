@@ -156,6 +156,22 @@ export interface Gasto {
   created_at: string
 }
 
+export interface UserPermissions {
+  id: number
+  email: string
+  role: UserRol
+  can_manage_electores: boolean
+  can_access_gastos: boolean
+  can_access_lista: boolean
+  can_access_eventos: boolean
+  can_access_campanas: boolean
+  invited_at: string
+  accepted_at: string | null
+  invited_by: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface Evento {
   id: number
   nombre: string
