@@ -79,7 +79,7 @@ Deno.serve(async (req: Request) => {
       auth: { autoRefreshToken: false, persistSession: false },
     })
 
-    // 6. Generate the invite link — token_hash is the one-time token
+    // 6. Generate the invite link — hashed_token is the one-time token
     const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
       type: 'invite',
       email,
@@ -89,13 +89,13 @@ Deno.serve(async (req: Request) => {
       },
     })
 
-    if (linkError || !linkData?.properties?.token_hash) {
+    if (linkError || !linkData?.properties?.hashed_token) {
       console.error('generateLink error:', linkError)
       return json({ error: 'Failed to generate invite link' }, 500)
     }
 
     // 7. Build hash-fragment URL so WhatsApp/Telegram crawlers can't consume the token
-    const tokenHash = linkData.properties.token_hash
+    const tokenHash = linkData.properties.hashed_token
     const inviteUrl = `${siteUrl}/auth/confirm#type=invite&token_hash=${tokenHash}`
 
     // 8. Upsert user_permissions — non-fatal if it fails
