@@ -31,7 +31,8 @@ export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Redirect unauthenticated users to login
-  if (!user && pathname !== '/login') {
+  // /auth/* paths are public (invite confirm, set-password)
+  if (!user && pathname !== '/login' && !pathname.startsWith('/auth/')) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
