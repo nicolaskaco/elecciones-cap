@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { PersonaEditForm } from './persona-edit-form'
+import { PersonaDetailDialog } from './persona-detail-dialog'
 import { ImportPersonasDialog } from './import-personas-dialog'
 import { ExportDialog, type ExportField } from '@/components/export-dialog'
 import { ROL_LABELS } from '@/lib/constants/lista'
@@ -33,6 +34,8 @@ interface PersonasListaClientProps {
 export function PersonasListaClient({ personas }: PersonasListaClientProps) {
   const [editingPersona, setEditingPersona] = useState<PersonaConRoles | null>(null)
   const [formOpen, setFormOpen] = useState(false)
+  const [viewingPersona, setViewingPersona] = useState<PersonaConRoles | null>(null)
+  const [detailOpen, setDetailOpen] = useState(false)
   const [search, setSearch] = useState('')
 
   function openCreate() { setEditingPersona(null); setFormOpen(true) }
@@ -105,7 +108,7 @@ export function PersonasListaClient({ personas }: PersonasListaClientProps) {
               </TableRow>
             ) : (
               filtered.map(p => (
-                <TableRow key={p.id}>
+                <TableRow key={p.id} className="cursor-pointer" onClick={() => { setViewingPersona(p); setDetailOpen(true) }}>
                   <TableCell className="font-medium">{p.nombre}</TableCell>
                   <TableCell className="text-muted-foreground">{p.cedula ?? '—'}</TableCell>
                   <TableCell className="text-muted-foreground">{p.nro_socio ?? '—'}</TableCell>
@@ -122,7 +125,7 @@ export function PersonasListaClient({ personas }: PersonasListaClientProps) {
                   </TableCell>
                   <TableCell>
                     <div className="flex justify-end">
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(p)}>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={e => { e.stopPropagation(); openEdit(p) }}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
                     </div>
@@ -135,6 +138,7 @@ export function PersonasListaClient({ personas }: PersonasListaClientProps) {
       </div>
 
       <PersonaEditForm open={formOpen} onOpenChange={setFormOpen} persona={editingPersona} />
+      <PersonaDetailDialog open={detailOpen} onOpenChange={setDetailOpen} persona={viewingPersona} />
     </div>
   )
 }
