@@ -44,7 +44,7 @@ function parsePosicion(posicion: string | null): { numero: string; sufijo: strin
 
 const schema = z.object({
   persona_id: z.string().min(1, 'Seleccioná una persona'),
-  tipo: z.enum(['Dirigente', 'Comision_Electoral', 'Comision_Fiscal', 'Asamblea_Representativa'] as const),
+  tipo: z.enum(['Dirigente', 'Comision_Electoral', 'Comision_Fiscal', 'Asamblea_Representativa', 'Colaborador'] as const),
   posicion_numero: z.string().optional(),
   posicion_sufijo: z.string().optional(),
   posicion: z.string().optional(),

@@ -13,9 +13,14 @@ import {
   Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 import { createPersona, updatePersona } from '@/lib/actions/lista'
-import type { PersonaConRoles } from '@/types/database'
+import { ROL_LABELS } from '@/lib/constants/lista'
+import type { PersonaConRoles, RolListaTipo } from '@/types/database'
+
+const ROL_OPTIONS = Object.entries(ROL_LABELS) as [RolListaTipo, string][]
 
 const schema = z.object({
   nombre: z.string().min(1, 'Nombre requerido'),
@@ -25,6 +30,9 @@ const schema = z.object({
   direccion: z.string().optional(),
   fecha_nacimiento: z.string().optional(),
   email: z.string().email('Correo inválido').optional().or(z.literal('')),
+  quien_lo_trajo: z.string().optional(),
+  comentario: z.string().optional(),
+  roles: z.array(z.string()),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -32,6 +40,7 @@ type FormValues = z.infer<typeof schema>
 const EMPTY: FormValues = {
   nombre: '', cedula: '', nro_socio: '', celular: '',
   direccion: '', fecha_nacimiento: '', email: '',
+  quien_lo_trajo: '', comentario: '', roles: [],
 }
 
 interface PersonaEditFormProps {
@@ -60,6 +69,9 @@ export function PersonaEditForm({ open, onOpenChange, persona }: PersonaEditForm
         direccion: persona.direccion ?? '',
         fecha_nacimiento: persona.fecha_nacimiento ?? '',
         email: persona.email ?? '',
+        quien_lo_trajo: persona.quien_lo_trajo ?? '',
+        comentario: persona.comentario ?? '',
+        roles: persona.roles_lista.map(r => r.tipo),
       } : EMPTY)
     }
   }, [open, persona, isEdit, form])
@@ -75,6 +87,9 @@ export function PersonaEditForm({ open, onOpenChange, persona }: PersonaEditForm
         direccion: values.direccion || null,
         fecha_nacimiento: values.fecha_nacimiento || null,
         email: values.email || null,
+        comentario: values.comentario || null,
+        quien_lo_trajo: values.quien_lo_trajo || null,
+        roles: (values.roles ?? []) as RolListaTipo[],
       }
       if (isEdit) {
         await updatePersona(persona.id, payload)
@@ -147,6 +162,52 @@ export function PersonaEditForm({ open, onOpenChange, persona }: PersonaEditForm
                 <FormItem>
                   <FormLabel>Dirección</FormLabel>
                   <FormControl><Input {...field} placeholder="Calle 1234" /></FormControl>
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="quien_lo_trajo" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Quién lo trajo</FormLabel>
+                  <FormControl><Input {...field} placeholder="Nombre de quien lo refirió" /></FormControl>
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="comentario" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Comentario</FormLabel>
+                  <FormControl>
+                    <Textarea {...field} placeholder="Notas adicionales..." className="resize-none" rows={3} />
+                  </FormControl>
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="roles" render={() => (
+                <FormItem>
+                  <FormLabel>Roles</FormLabel>
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    {ROL_OPTIONS.map(([value, label]) => (
+                      <FormField
+                        key={value}
+                        control={form.control}
+                        name="roles"
+                        render={({ field }) => (
+                          <FormItem className="flex items-center gap-2 space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value?.includes(value)}
+                                onCheckedChange={(checked) => {
+                                  const current = field.value ?? []
+                                  field.onChange(
+                                    checked
+                                      ? [...current, value]
+                                      : current.filter(v => v !== value)
+                                  )
+                                }}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal cursor-pointer">{label}</FormLabel>
+                          </FormItem>
+                        )}
+                      />
+                    ))}
+                  </div>
                 </FormItem>
               )} />
             </div>

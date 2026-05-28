@@ -9,8 +9,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { EventoFormDialog } from './evento-form'
 import { deleteEvento } from '@/lib/actions/eventos'
-import type { Evento } from '@/types/database'
-import { Plus, Pencil, Trash2, CalendarDays, MapPin, Clock } from 'lucide-react'
+import type { EventoConPersonas, Persona } from '@/types/database'
+import { Plus, Pencil, Trash2, CalendarDays, MapPin, Clock, Users } from 'lucide-react'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 
 function formatFecha(fecha: string) {
@@ -29,7 +29,6 @@ function getEventDateTime(fecha: string, hora: string | null): Date {
     const [h, m] = hora.split(':').map(Number)
     base.setHours(h, m, 0, 0)
   } else {
-    // No time set: treat as end of day so the whole day counts as upcoming
     base.setHours(23, 59, 59, 999)
   }
   return base
@@ -37,12 +36,13 @@ function getEventDateTime(fecha: string, hora: string | null): Date {
 
 
 interface EventosClientProps {
-  eventos: Evento[]
+  eventos: EventoConPersonas[]
+  personasTodas: Persona[]
 }
 
-export function EventosClient({ eventos }: EventosClientProps) {
+export function EventosClient({ eventos, personasTodas }: EventosClientProps) {
   const [formOpen, setFormOpen] = useState(false)
-  const [editingEvento, setEditingEvento] = useState<Evento | null>(null)
+  const [editingEvento, setEditingEvento] = useState<EventoConPersonas | null>(null)
   const [pendingId, setPendingId] = useState<number | null>(null)
   const [, startTransition] = useTransition()
 
@@ -51,7 +51,7 @@ export function EventosClient({ eventos }: EventosClientProps) {
   const past = eventos.filter(e => getEventDateTime(e.fecha, e.hora) <= now)
 
   function openCreate() { setEditingEvento(null); setFormOpen(true) }
-  function openEdit(e: Evento) { setEditingEvento(e); setFormOpen(true) }
+  function openEdit(e: EventoConPersonas) { setEditingEvento(e); setFormOpen(true) }
 
   function handleDeleteConfirm() {
     if (pendingId === null) return
@@ -67,7 +67,8 @@ export function EventosClient({ eventos }: EventosClientProps) {
     })
   }
 
-  function EventoRow({ e }: { e: Evento }) {
+  function EventoRow({ e }: { e: EventoConPersonas }) {
+    const personaCount = e.evento_personas.length
     return (
       <TableRow key={e.id}>
         <TableCell className="whitespace-nowrap">
@@ -98,6 +99,14 @@ export function EventosClient({ eventos }: EventosClientProps) {
             <div className="flex items-center gap-1 text-muted-foreground">
               <MapPin className="h-3.5 w-3.5 shrink-0" />
               <span className="truncate max-w-[160px]">{e.direccion}</span>
+            </div>
+          ) : '—'}
+        </TableCell>
+        <TableCell>
+          {personaCount > 0 ? (
+            <div className="flex items-center gap-1 text-muted-foreground">
+              <Users className="h-3.5 w-3.5 shrink-0" />
+              <span className="text-sm">{personaCount}</span>
             </div>
           ) : '—'}
         </TableCell>
@@ -141,13 +150,14 @@ export function EventosClient({ eventos }: EventosClientProps) {
                 <TableHead>Nombre</TableHead>
                 <TableHead>Descripción</TableHead>
                 <TableHead>Lugar</TableHead>
+                <TableHead>Personas</TableHead>
                 <TableHead className="w-24 text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {upcoming.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-6">
                     No hay eventos próximos.
                   </TableCell>
                 </TableRow>
@@ -173,6 +183,7 @@ export function EventosClient({ eventos }: EventosClientProps) {
                   <TableHead>Nombre</TableHead>
                   <TableHead>Descripción</TableHead>
                   <TableHead>Lugar</TableHead>
+                  <TableHead>Personas</TableHead>
                   <TableHead className="w-24 text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -184,7 +195,12 @@ export function EventosClient({ eventos }: EventosClientProps) {
         </div>
       )}
 
-      <EventoFormDialog open={formOpen} onOpenChange={setFormOpen} evento={editingEvento} />
+      <EventoFormDialog
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        evento={editingEvento}
+        personasTodas={personasTodas}
+      />
       <ConfirmDialog
         open={pendingId !== null}
         onOpenChange={(open) => { if (!open) setPendingId(null) }}

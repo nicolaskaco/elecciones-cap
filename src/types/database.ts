@@ -9,6 +9,7 @@ export type RolListaTipo =
   | 'Comision_Electoral'
   | 'Comision_Fiscal'
   | 'Asamblea_Representativa'
+  | 'Colaborador'
 export type ComisionTipo =
   | 'Futbol'
   | 'Formativas'
@@ -54,6 +55,8 @@ export interface Persona {
   celular: string | null
   email: string | null
   direccion: string | null
+  comentario: string | null
+  quien_lo_trajo: string | null
   created_at: string
   updated_at: string
 }
@@ -163,6 +166,13 @@ export interface Evento {
   created_at: string
 }
 
+export interface EventoPersona {
+  id: number
+  evento_id: number
+  persona_id: number
+  created_at: string
+}
+
 // ============================================================
 // COMPOSITE TYPES
 // ============================================================
@@ -186,4 +196,8 @@ export interface ComisionConPersona extends ComisionInteres {
 
 export interface PersonaConRoles extends Persona {
   roles_lista: RolLista[]
+}
+
+export interface EventoConPersonas extends Evento {
+  evento_personas: { persona_id: number; personas: Pick<Persona, 'id' | 'nombre'> }[]
 }

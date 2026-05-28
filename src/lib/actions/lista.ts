@@ -30,11 +30,14 @@ export async function createPersona(data: {
   direccion?: string | null
   fecha_nacimiento?: string | null
   email?: string | null
+  comentario?: string | null
+  quien_lo_trajo?: string | null
+  roles?: RolListaTipo[]
 }): Promise<void> {
   await requireAdmin()
   const supabase = await createClient()
 
-  const { error } = await supabase.from('personas').insert({
+  const { data: inserted, error } = await supabase.from('personas').insert({
     nombre: data.nombre,
     cedula: data.cedula || null,
     nro_socio: data.nro_socio || null,
@@ -42,9 +45,19 @@ export async function createPersona(data: {
     direccion: data.direccion || null,
     fecha_nacimiento: data.fecha_nacimiento || null,
     email: data.email || null,
-  })
+    comentario: data.comentario || null,
+    quien_lo_trajo: data.quien_lo_trajo || null,
+  }).select('id').single()
 
   if (error) throw new Error(error.message)
+
+  if (data.roles && data.roles.length > 0) {
+    const { error: rolesError } = await supabase.from('roles_lista').insert(
+      data.roles.map(tipo => ({ persona_id: inserted.id, tipo }))
+    )
+    if (rolesError) throw new Error(rolesError.message)
+  }
+
   revalidatePath('/personas-lista')
 }
 
@@ -171,6 +184,9 @@ export async function updatePersona(
     direccion?: string | null
     fecha_nacimiento?: string | null
     email?: string | null
+    comentario?: string | null
+    quien_lo_trajo?: string | null
+    roles?: RolListaTipo[]
   }
 ): Promise<void> {
   await requireAdmin()
@@ -186,10 +202,28 @@ export async function updatePersona(
       direccion: data.direccion || null,
       fecha_nacimiento: data.fecha_nacimiento || null,
       email: data.email || null,
+      comentario: data.comentario || null,
+      quien_lo_trajo: data.quien_lo_trajo || null,
     })
     .eq('id', personaId)
 
   if (error) throw new Error(error.message)
+
+  if (data.roles !== undefined) {
+    const { error: delError } = await supabase
+      .from('roles_lista')
+      .delete()
+      .eq('persona_id', personaId)
+    if (delError) throw new Error(delError.message)
+
+    if (data.roles.length > 0) {
+      const { error: insError } = await supabase.from('roles_lista').insert(
+        data.roles.map(tipo => ({ persona_id: personaId, tipo }))
+      )
+      if (insError) throw new Error(insError.message)
+    }
+  }
+
   revalidatePath('/personas-lista')
   revalidatePath('/lista')
 }
