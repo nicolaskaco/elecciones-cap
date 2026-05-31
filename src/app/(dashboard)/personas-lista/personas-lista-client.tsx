@@ -15,6 +15,14 @@ import { ROL_LABELS } from '@/lib/constants/lista'
 import type { PersonaConRoles, RolListaTipo } from '@/types/database'
 import { Pencil, Plus, Search } from 'lucide-react'
 
+const ROL_BADGE_VARIANT: Record<RolListaTipo, 'default' | 'secondary' | 'outline'> = {
+  Dirigente: 'default',
+  Comision_Electoral: 'secondary',
+  Comision_Fiscal: 'secondary',
+  Asamblea_Representativa: 'outline',
+  Colaborador: 'outline',
+}
+
 const EXPORT_FIELDS: ExportField<PersonaConRoles>[] = [
   { key: 'nombre',           label: 'Nombre',             defaultChecked: true,  getValue: p => p.nombre },
   { key: 'cedula',           label: 'Cédula',             defaultChecked: true,  getValue: p => p.cedula },
@@ -91,18 +99,16 @@ export function PersonasListaClient({ personas }: PersonasListaClientProps) {
           <TableHeader>
             <TableRow>
               <TableHead>Nombre</TableHead>
-              <TableHead>Cédula</TableHead>
-              <TableHead>Nº Socio</TableHead>
               <TableHead>Celular</TableHead>
-              <TableHead>Dirección</TableHead>
               <TableHead>Roles</TableHead>
+              <TableHead>Comentario</TableHead>
               <TableHead className="w-16 text-right">Acción</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                   {search ? 'No se encontraron personas.' : 'No hay personas en la lista.'}
                 </TableCell>
               </TableRow>
@@ -110,19 +116,17 @@ export function PersonasListaClient({ personas }: PersonasListaClientProps) {
               filtered.map(p => (
                 <TableRow key={p.id} className="cursor-pointer" onClick={() => { setViewingPersona(p); setDetailOpen(true) }}>
                   <TableCell className="font-medium">{p.nombre}</TableCell>
-                  <TableCell className="text-muted-foreground">{p.cedula ?? '—'}</TableCell>
-                  <TableCell className="text-muted-foreground">{p.nro_socio ?? '—'}</TableCell>
                   <TableCell className="text-muted-foreground">{p.celular ?? '—'}</TableCell>
-                  <TableCell className="text-muted-foreground max-w-[160px] truncate">{p.direccion ?? '—'}</TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
                       {p.roles_lista.map(r => (
-                        <Badge key={r.id} variant="outline" className="text-xs">
+                        <Badge key={r.id} variant={ROL_BADGE_VARIANT[r.tipo as RolListaTipo]} className="text-xs">
                           {ROL_LABELS[r.tipo as RolListaTipo]}
                         </Badge>
                       ))}
                     </div>
                   </TableCell>
+                  <TableCell className="text-muted-foreground max-w-[200px] truncate">{p.comentario ?? '—'}</TableCell>
                   <TableCell>
                     <div className="flex justify-end">
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={e => { e.stopPropagation(); openEdit(p) }}>
