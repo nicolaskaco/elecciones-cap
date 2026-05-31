@@ -174,7 +174,7 @@ export function GastosClient({ gastos }: GastosClientProps) {
         </Table>
       </div>
 
-      <GastoFormDialog open={formOpen} onOpenChange={setFormOpen} gasto={editingGasto} />
+      <GastoFormDialog key={formOpen ? (editingGasto?.id ?? 'new') : 'closed'} open={formOpen} onOpenChange={setFormOpen} gasto={editingGasto} />
       <ConfirmDialog
         open={pendingId !== null}
         onOpenChange={(open) => { if (!open) setPendingId(null) }}

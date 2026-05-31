@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -56,25 +56,19 @@ export function PersonaEditForm({ open, onOpenChange, persona }: PersonaEditForm
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: EMPTY,
+    defaultValues: isEdit ? {
+      nombre: persona.nombre,
+      cedula: persona.cedula ?? '',
+      nro_socio: persona.nro_socio ?? '',
+      celular: persona.celular ?? '',
+      direccion: persona.direccion ?? '',
+      fecha_nacimiento: persona.fecha_nacimiento ?? '',
+      email: persona.email ?? '',
+      quien_lo_trajo: persona.quien_lo_trajo ?? '',
+      comentario: persona.comentario ?? '',
+      roles: persona.roles_lista.map(r => r.tipo),
+    } : EMPTY,
   })
-
-  useEffect(() => {
-    if (open) {
-      form.reset(isEdit ? {
-        nombre: persona.nombre,
-        cedula: persona.cedula ?? '',
-        nro_socio: persona.nro_socio ?? '',
-        celular: persona.celular ?? '',
-        direccion: persona.direccion ?? '',
-        fecha_nacimiento: persona.fecha_nacimiento ?? '',
-        email: persona.email ?? '',
-        quien_lo_trajo: persona.quien_lo_trajo ?? '',
-        comentario: persona.comentario ?? '',
-        roles: persona.roles_lista.map(r => r.tipo),
-      } : EMPTY)
-    }
-  }, [open, persona, isEdit, form])
 
   async function onSubmit(values: FormValues) {
     setLoading(true)

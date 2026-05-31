@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -36,40 +36,34 @@ interface EventoFormDialogProps {
   personasTodas: Persona[]
 }
 
+function buildDefaults(evento?: EventoConPersonas | null): FormValues {
+  if (evento) return {
+    nombre: evento.nombre,
+    descripcion: evento.descripcion ?? '',
+    fecha: evento.fecha,
+    hora: evento.hora ? evento.hora.slice(0, 5) : '',
+    direccion: evento.direccion ?? '',
+  }
+  return {
+    nombre: '',
+    descripcion: '',
+    fecha: new Date().toISOString().split('T')[0],
+    hora: '',
+    direccion: '',
+  }
+}
+
 export function EventoFormDialog({ open, onOpenChange, evento, personasTodas }: EventoFormDialogProps) {
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
-  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [selectedIds, setSelectedIds] = useState<number[]>(
+    () => evento?.evento_personas.map(ep => ep.persona_id) ?? []
+  )
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { nombre: '', descripcion: '', fecha: '', hora: '', direccion: '' },
+    defaultValues: buildDefaults(evento),
   })
-
-  useEffect(() => {
-    if (open) {
-      setSearch('')
-      if (evento) {
-        form.reset({
-          nombre: evento.nombre,
-          descripcion: evento.descripcion ?? '',
-          fecha: evento.fecha,
-          hora: evento.hora ? evento.hora.slice(0, 5) : '',
-          direccion: evento.direccion ?? '',
-        })
-        setSelectedIds(evento.evento_personas.map(ep => ep.persona_id))
-      } else {
-        form.reset({
-          nombre: '',
-          descripcion: '',
-          fecha: new Date().toISOString().split('T')[0],
-          hora: '',
-          direccion: '',
-        })
-        setSelectedIds([])
-      }
-    }
-  }, [open, evento, form])
 
   function togglePersona(id: number) {
     setSelectedIds(prev =>
