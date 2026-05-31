@@ -13,7 +13,7 @@ App web responsive (desktop + mobile) para gestionar la campaña electoral de un
 
 ## Roles de Usuario
 | Rol | Acceso |
-|-----|--------|
+|-----|--------|`
 | **Admin** | Todo: electores, llamadas, integrantes lista, gastos, campañas email, eventos, configuración flow, reportes |
 | **Voluntario** | Solo: nombre + celular de electores asignados, flow de llamada, registrar resultado |
 
@@ -38,15 +38,24 @@ Tabla central de personas. Puede ser elector, integrante de lista, o ambos.
 | celular | text | |
 | email | text | |
 | direccion | text | Dirección completa |
+| comentario | text \| null | Notas libres sobre la persona |
+| quien_lo_trajo | text \| null | Referente que la incorporó a la lista |
 | created_at | timestamptz | |
 | updated_at | timestamptz | |
 
 ### electores
-Extiende personas con datos electorales.
+Tabla autónoma — no depende de personas. Contiene todos los campos de contacto directamente.
 | Campo | Tipo | Notas |
 |-------|------|-------|
 | id | bigint PK (serial) | |
-| persona_id | bigint FK → personas | |
+| nombre | text NOT NULL | |
+| cedula | text | |
+| nro_socio | text | UNIQUE parcial (where not null) |
+| fecha_nacimiento | date | |
+| telefono | text | Fijo |
+| celular | text | |
+| email | text | |
+| direccion | text | |
 | estado | enum | Pendiente, Llamado, Confirmado, Para_Enviar, Lista_Enviada, Numero_Incorrecto, Descartado |
 | asignado_a | uuid FK → perfiles | Voluntario asignado |
 | enviar_lista | boolean | default false — marcado para envío de lista |
@@ -60,7 +69,7 @@ Una persona puede tener múltiples roles en la lista.
 |-------|------|-------|
 | id | bigint PK (serial) | |
 | persona_id | bigint FK → personas | |
-| tipo | enum | Dirigente, Comision_Electoral, Comision_Fiscal, Asamblea_Representativa |
+| tipo | enum | Dirigente, Comision_Electoral, Comision_Fiscal, Asamblea_Representativa, Colaborador |
 | posicion | text | Para roles estructurados: "1 Titular", "1 1er Suplente", "2 2do Suplente"; para Asamblea: número |
 | quien_lo_trajo | text | Aplica a todos los tipos |
 | comentario | text | |
@@ -161,6 +170,36 @@ Charlas, reuniones, eventos de campaña.
 | descripcion | text | |
 | created_at | timestamptz | |
 
+### evento_personas
+Junction table para la relación many-to-many entre eventos y personas.
+| Campo | Tipo | Notas |
+|-------|------|-------|
+| id | bigint PK (serial) | |
+| evento_id | bigint FK → eventos | ON DELETE CASCADE |
+| persona_id | bigint FK → personas | ON DELETE CASCADE |
+| created_at | timestamptz | |
+| | UNIQUE (evento_id, persona_id) | |
+
+RLS: Admin = full access; Voluntario = solo SELECT.
+
+### user_permissions
+Configuración previa al invite. Al aceptar, un trigger sincroniza el rol en `perfiles`.
+| Campo | Tipo | Notas |
+|-------|------|-------|
+| id | bigint PK (serial) | |
+| email | text UNIQUE NOT NULL | |
+| role | text | 'Admin' \| 'Voluntario', default 'Voluntario' |
+| can_manage_electores | boolean | default false |
+| can_access_gastos | boolean | default false |
+| can_access_lista | boolean | default false |
+| can_access_eventos | boolean | default false |
+| can_access_campanas | boolean | default false |
+| invited_at | timestamptz | |
+| accepted_at | timestamptz \| null | Se setea al aceptar invitación |
+| invited_by | uuid FK → perfiles | |
+| created_at | timestamptz | |
+| updated_at | timestamptz | |
+
 ### perfiles
 Usuarios de la app (extends Supabase Auth).
 | Campo | Tipo | Notas |
@@ -180,10 +219,11 @@ Usuarios de la app (extends Supabase Auth).
 ### Home / Dashboard
 - KPI cards: Total Electores, Total Llamadas, Confirmados (Aceptaron), Tasa de Aceptación (Confirmados / Total)
 - **Admin:** tabla de progreso por voluntario — asignados, llamadas realizadas, confirmados, tasa de conversión (color-coded)
+- **Admin:** card "Electores por Estado" — barra horizontal coloreada por estado con count y %, cada fila es un link a `/electores?estado=X`
 - Lista de próximos eventos (los 5 próximos, ordenados por fecha+hora)
 
 ### Electores
-- **Admin:** Tabla completa con búsqueda, filtro por estado, filtro "Sin asignar" (toggle), export CSV, import Excel
+- **Admin:** Tabla completa con búsqueda (por nombre y nro_socio), filtro por estado, filtro por voluntario, filtro "Sin asignar" (toggle), export CSV, import Excel
 - **Admin — columnas:** Nombre, Edad (calculada desde fecha_nacimiento), Nro Socio, Celular, Estado (badge), Asignado a
 - **Admin — acciones masivas (checkboxes):** selección por página con patrón Gmail (banner para seleccionar todos los N resultados), asignación masiva a voluntario, cambio masivo de estado
 - **Voluntario:** Solo ve los asignados (nombre + celular)
@@ -194,7 +234,7 @@ Usuarios de la app (extends Supabase Auth).
 - Botón "Editar" (Admin) → abre ElectorFormDialog inline
 - Botón "Iniciar llamada" → navega a `/llamadas/flow/[id]`
 - Card Información Personal: Cédula, Nro Socio, Celular, Teléfono, Email, Dirección, Fecha de nacimiento (formateada + edad en paréntesis); campos vacíos ocultos
-- Card Estado: estado (badge), asignado a, notas
+- Card Estado: estado (badge), asignado a, notas (con editor inline para Admin)
 - Historial de llamadas: resultado (badge con label legible), voluntario que llamó, fecha formateada
 
 ### Flow de Llamada
@@ -205,7 +245,7 @@ Usuarios de la app (extends Supabase Auth).
 
 ### Llamadas
 - **Voluntario:** tabla de electores asignados con filtro de estado (Para llamar = Pendiente+Llamado por defecto; también: Todos, Confirmado, Para Enviar, Lista Enviada, Número Incorrecto, Descartado). Contador de pendientes y sin atender.
-- **Admin:** 4 tarjetas resumen (count + % por cada resultado: Nos vota, No nos vota, No atendió, Número incorrecto) + tabla de desglose por voluntario (total + columna por resultado) + historial completo
+- **Admin:** 4 tarjetas resumen (count + % por cada resultado: Nos vota, No nos vota, No atendió, Número incorrecto) + tabla de desglose por voluntario (total + columna por resultado) + historial completo con filtro por fecha (from/to), filtro por resultado, y paginación (50/página)
 
 ### Configuración del Flow (Admin)
 - CRUD de preguntas
@@ -215,7 +255,8 @@ Usuarios de la app (extends Supabase Auth).
 ### Personas de la Lista (`/personas-lista`)
 - Tabla de personas con sus roles en la lista (badges)
 - Búsqueda por nombre o cédula
-- CRUD: crear/editar datos de personas
+- Click en fila → abre dialog de detalle read-only: info personal, referente (quien_lo_trajo), comentario, roles con badges, y eventos vinculados
+- CRUD: crear/editar datos de personas (incluye campos comentario y quien_lo_trajo)
 - Import desde Excel (columnas de tabla personas)
 - Export a Excel (selección de campos)
 
@@ -248,11 +289,14 @@ Usuarios de la app (extends Supabase Auth).
 
 ### Eventos (Admin)
 - CRUD de eventos con fecha y hora opcional
+- Vincular personas al evento: selector multi-búsqueda en el form; cuenta de personas vinculadas visible en la lista
 - Split view: Próximos / Pasados (corte por datetime actual, considera hora si existe)
 
 ### Usuarios (Admin)
-- Crear/editar usuarios
-- Asignar rol (Admin/Voluntario)
+- **Invitar usuario:** Admin llena formulario (email, rol, permisos granulares: manage_electores, gastos, lista, eventos, campanas)
+- Server Action llama al Edge Function `invite-user` → genera URL de invitación de un solo uso (24h) via `auth.admin.generateLink()`
+- La UI muestra la URL generada para que el Admin la comparta; se crea fila en `user_permissions`
+- Al aceptar, trigger en DB sincroniza el rol desde `user_permissions` → `perfiles`
 - Asignar electores a voluntarios
 
 ---
@@ -285,6 +329,14 @@ Disponible para:
 
 ---
 
+## Supabase Edge Functions
+
+| Función | Ubicación | Propósito |
+|---------|-----------|-----------|
+| `invite-user` | `supabase/functions/invite-user/` | Llamada por Server Action. Verifica que el caller sea Admin, genera link de invitación via `auth.admin.generateLink()`, guarda permisos en `user_permissions`. |
+
+---
+
 ## Supabase RLS Policies
 - **personas/electores:** Admin = full access. Voluntario = solo SELECT donde electores.asignado_a = auth.uid()
 - **llamadas/respuestas_flow:** Voluntario = INSERT own + SELECT own. Admin = full.
@@ -299,9 +351,10 @@ src/
 │   ├── layout.tsx
 │   ├── page.tsx
 │   ├── login/
+│   ├── auth/confirm/             # Página de aceptación de invitación (inline password form)
 │   └── (dashboard)/
 │       ├── layout.tsx            # Auth guard — getRequiredPerfil()
-│       ├── page.tsx              # Home/Dashboard
+│       ├── page.tsx              # Home/Dashboard (KPIs + voluntarios + estado breakdown)
 │       ├── electores/
 │       │   ├── page.tsx          # Lista
 │       │   ├── data-table.tsx    # Client component: tabla, filtros, bulk actions
@@ -309,19 +362,25 @@ src/
 │       │   └── [id]/
 │       │       ├── page.tsx      # Detalle del elector
 │       │       └── actions.tsx   # Client wrapper para Edit dialog en detalle
-│       │   └── import/           # Import Excel
 │       ├── llamadas/
 │       │   ├── page.tsx
-│       │   ├── llamadas-client.tsx  # VoluntarioView + AdminView (stats + historial)
+│       │   ├── llamadas-client.tsx  # VoluntarioView + AdminView (stats + historial + filtros)
 │       │   └── flow/[electorId]/page.tsx
 │       ├── flow-config/          # Admin: configurar preguntas
 │       ├── lista/                # Integrantes de la lista
-│       ├── personas-lista/       # Datos personales de integrantes
+│       ├── personas-lista/
+│       │   ├── page.tsx
+│       │   ├── personas-lista-client.tsx
+│       │   ├── persona-edit-form.tsx
+│       │   └── persona-detail-dialog.tsx  # Dialog read-only con eventos vinculados
 │       ├── campanas/             # Email campaigns (stub)
 │       ├── cartas/               # Envío de cartas físicas
 │       ├── gastos/
-│       ├── eventos/
+│       ├── eventos/              # CRUD + vinculación de personas
 │       └── usuarios/
+│           ├── page.tsx
+│           ├── invite-dialog.tsx          # Form + URL resultado del invite
+│           └── invite-button-client.tsx
 ├── components/
 │   ├── ui/                       # shadcn components (no editar)
 │   ├── confirm-dialog.tsx        # Diálogo de confirmación reutilizable
@@ -331,12 +390,18 @@ src/
 │   │   ├── electores.ts          # getElectores, CRUD, asignarEnMasa, cambiarEstadoEnMasa
 │   │   ├── llamadas.ts           # getElectoresParaLlamar, getAllLlamadas, submitLlamada
 │   │   ├── import-electores.ts   # previewImport, importElectores (bulk, chunked)
+│   │   ├── usuarios.ts           # inviteUsuario (llama al Edge Function)
 │   │   └── ...
+│   ├── constants/
+│   │   └── lista.ts              # ROL_LABELS, colores de rol y estado
 │   ├── supabase/                 # Clientes server/client
 │   ├── validations/              # Zod schemas
 │   └── csv-export.ts             # Export CSV de electores
-└── types/
-    └── database.ts               # Tipos e interfaces de DB (fuente de verdad)
+├── types/
+│   └── database.ts               # Tipos e interfaces de DB (fuente de verdad)
+└── supabase/
+    └── functions/
+        └── invite-user/          # Edge Function: genera links de invitación
 ```
 
 ---
@@ -355,3 +420,12 @@ src/
 11. ✅ Detalle de elector: edición inline, llamadas con voluntario y resultado, edad formateada
 12. ✅ Llamadas admin: tarjetas por resultado + desglose por voluntario
 13. ✅ Llamadas voluntario: filtro de estado configurable
+14. ✅ Electores: filtro por voluntario + búsqueda restringida a nombre/nro_socio
+15. ✅ Elector detalle: editor de notas inline (Admin)
+16. ✅ Llamadas admin: filtro por fecha (from/to), paginación (50/página), filtro por resultado
+17. ✅ Dashboard: card de breakdown de electores por estado con links a filtros
+18. ✅ Electores: tabla autónoma (desacoplada de personas) — campos de contacto propios
+19. ✅ Personas de la Lista: dialog de detalle read-only (con eventos vinculados)
+20. ✅ Personas: campos comentario + quien_lo_trajo; roles_lista: tipo Colaborador
+21. ✅ Eventos: vinculación de personas (many-to-many via evento_personas)
+22. ✅ Usuarios: sistema de invitación via Edge Function con permisos granulares
