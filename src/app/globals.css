@@ -9,6 +9,13 @@
 }
 
 @layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+
   :root {
     --background: 0 0% 96%;
     --foreground: 0 0% 4%;
