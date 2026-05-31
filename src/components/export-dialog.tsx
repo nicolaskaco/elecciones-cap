@@ -63,7 +63,7 @@ export function ExportDialog<T>({ data, fields, filename, disabled }: ExportDial
 
   return (
     <>
-      <Button variant="outline" size="sm" onClick={() => setOpen(true)} disabled={disabled || data.length === 0}>
+      <Button variant="outline" size="sm" onClick={() => setOpen(true)} disabled={disabled || data.length === 0} className="dark:border-primary dark:text-primary dark:hover:bg-primary/20">
         <Download className="h-4 w-4 mr-2" />
         Exportar
       </Button>

@@ -96,7 +96,7 @@ export function ImportPersonasDialog() {
 
   return (
     <>
-      <Button variant="outline" size="sm" onClick={handleOpen}>
+      <Button variant="outline" size="sm" onClick={handleOpen} className="dark:border-primary dark:text-primary dark:hover:bg-primary/20">
         <Upload className="h-4 w-4 mr-2" />
         Importar
       </Button>
