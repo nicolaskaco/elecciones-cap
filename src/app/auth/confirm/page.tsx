@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
+import { useMountEffect } from '@/hooks/use-mount-effect'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -41,7 +42,7 @@ export default function AuthConfirmPage() {
   // Keep the same client instance across OTP verification and password update
   const supabaseRef = useRef<SupabaseClient | null>(null)
 
-  useEffect(() => {
+  useMountEffect(() => {
     const hash = window.location.hash.slice(1)
     const params = new URLSearchParams(hash)
     const type = params.get('type')
@@ -78,7 +79,7 @@ export default function AuthConfirmPage() {
           setErrorMsg('No se pudo establecer la sesión. Intentá de nuevo.')
         }
       })
-  }, [])
+  })
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),

@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { useMountEffect } from '@/hooks/use-mount-effect'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
@@ -40,14 +41,14 @@ export function PersonaDetailDialog({ open, onOpenChange, persona }: PersonaDeta
   const [eventos, setEventos] = useState<Pick<Evento, 'id' | 'nombre' | 'fecha' | 'hora'>[]>([])
   const [loadingEventos, setLoadingEventos] = useState(false)
 
-  useEffect(() => {
-    if (!open || !persona) return
+  useMountEffect(() => {
+    if (!persona) return
     setLoadingEventos(true)
     getEventosParaPersona(persona.id)
       .then(setEventos)
       .catch(() => setEventos([]))
       .finally(() => setLoadingEventos(false))
-  }, [open, persona])
+  })
 
   if (!persona) return null
 

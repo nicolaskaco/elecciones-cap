@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -71,16 +71,32 @@ interface RolFormDialogProps {
   existingRoles: RolListaConPersona[]
 }
 
+function buildDefaults(rol?: RolListaConPersona | null): FormValues {
+  if (rol) {
+    const { numero, sufijo } = parsePosicion(rol.posicion)
+    return {
+      persona_id: rol.persona_id.toString(),
+      tipo: rol.tipo,
+      posicion_numero: numero,
+      posicion_sufijo: sufijo,
+      posicion: rol.posicion ?? '',
+      quien_lo_trajo: rol.quien_lo_trajo ?? '',
+      comentario: rol.comentario ?? '',
+    }
+  }
+  return {
+    persona_id: '', tipo: 'Dirigente',
+    posicion_numero: '', posicion_sufijo: '',
+    posicion: '', quien_lo_trajo: '', comentario: '',
+  }
+}
+
 export function RolFormDialog({ open, onOpenChange, rol, personas, existingRoles }: RolFormDialogProps) {
   const [loading, setLoading] = useState(false)
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: {
-      persona_id: '', tipo: 'Dirigente',
-      posicion_numero: '', posicion_sufijo: '',
-      posicion: '', quien_lo_trajo: '', comentario: '',
-    },
+    defaultValues: buildDefaults(rol),
   })
 
   const tipoWatched = form.watch('tipo')
@@ -96,40 +112,6 @@ export function RolFormDialog({ open, onOpenChange, rol, personas, existingRoles
   function isTaken(numero: string, sufijo: string) {
     return takenPositions.has(`${numero} ${sufijo}`)
   }
-
-  useEffect(() => {
-    if (open) {
-      if (rol) {
-        const { numero, sufijo } = parsePosicion(rol.posicion)
-        form.reset({
-          persona_id: rol.persona_id.toString(),
-          tipo: rol.tipo,
-          posicion_numero: numero,
-          posicion_sufijo: sufijo,
-          posicion: rol.posicion ?? '',
-          quien_lo_trajo: rol.quien_lo_trajo ?? '',
-          comentario: rol.comentario ?? '',
-        })
-      } else {
-        form.reset({
-          persona_id: '', tipo: 'Dirigente',
-          posicion_numero: '', posicion_sufijo: '',
-          posicion: '', quien_lo_trajo: '', comentario: '',
-        })
-      }
-    }
-  }, [open, rol, form])
-
-  // Clear sufijo when número changes if the current sufijo is now taken
-  useEffect(() => {
-    if (isStructured(tipoWatched)) {
-      const sufijo = form.getValues('posicion_sufijo')
-      if (sufijo && isTaken(numeroWatched ?? '', sufijo)) {
-        form.setValue('posicion_sufijo', '')
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [numeroWatched, tipoWatched])
 
   async function onSubmit(values: FormValues) {
     const posicion = isStructured(values.tipo)
@@ -233,7 +215,16 @@ export function RolFormDialog({ open, onOpenChange, rol, personas, existingRoles
                     <FormField control={form.control} name="posicion_numero" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Número *</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select
+                          onValueChange={(v) => {
+                            field.onChange(v)
+                            const sufijo = form.getValues('posicion_sufijo')
+                            if (sufijo && isTaken(v, sufijo)) {
+                              form.setValue('posicion_sufijo', '')
+                            }
+                          }}
+                          value={field.value}
+                        >
                           <FormControl>
                             <SelectTrigger><SelectValue placeholder={maxLabel} /></SelectTrigger>
                           </FormControl>

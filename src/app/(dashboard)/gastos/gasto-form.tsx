@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -45,37 +45,29 @@ interface GastoFormDialogProps {
   gasto?: Gasto | null
 }
 
+function buildDefaults(gasto?: Gasto | null): FormValues {
+  if (gasto) return {
+    rubro: gasto.rubro,
+    monto: String(gasto.monto),
+    fecha: gasto.fecha,
+    concepto: gasto.concepto ?? '',
+    programa_campana: gasto.programa_campana ?? '',
+    quien_pago: gasto.quien_pago ?? '',
+  }
+  return {
+    rubro: 'Evento', monto: '',
+    fecha: new Date().toISOString().split('T')[0],
+    concepto: '', programa_campana: '', quien_pago: '',
+  }
+}
+
 export function GastoFormDialog({ open, onOpenChange, gasto }: GastoFormDialogProps) {
   const [loading, setLoading] = useState(false)
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: {
-      rubro: 'Evento', monto: '', fecha: '',
-      concepto: '', programa_campana: '', quien_pago: '',
-    },
+    defaultValues: buildDefaults(gasto),
   })
-
-  useEffect(() => {
-    if (open) {
-      if (gasto) {
-        form.reset({
-          rubro: gasto.rubro,
-          monto: String(gasto.monto),
-          fecha: gasto.fecha,
-          concepto: gasto.concepto ?? '',
-          programa_campana: gasto.programa_campana ?? '',
-          quien_pago: gasto.quien_pago ?? '',
-        })
-      } else {
-        form.reset({
-          rubro: 'Evento', monto: '',
-          fecha: new Date().toISOString().split('T')[0],
-          concepto: '', programa_campana: '', quien_pago: '',
-        })
-      }
-    }
-  }, [open, gasto, form])
 
   async function onSubmit(values: FormValues) {
     setLoading(true)

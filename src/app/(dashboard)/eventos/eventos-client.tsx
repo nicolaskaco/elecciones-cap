@@ -196,6 +196,7 @@ export function EventosClient({ eventos, personasTodas }: EventosClientProps) {
       )}
 
       <EventoFormDialog
+        key={formOpen ? (editingEvento?.id ?? 'new') : 'closed'}
         open={formOpen}
         onOpenChange={setFormOpen}
         evento={editingEvento}

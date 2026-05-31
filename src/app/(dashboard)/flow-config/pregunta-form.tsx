@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -56,55 +56,34 @@ interface PreguntaFormDialogProps {
   pregunta?: PreguntaFlow | null
 }
 
+function buildDefaults(pregunta?: PreguntaFlow | null): FormValues {
+  if (pregunta) return {
+    texto: pregunta.texto,
+    tipo: pregunta.tipo as PreguntaTipo,
+    orden_default: pregunta.orden_default?.toString() ?? '',
+    activa: pregunta.activa,
+    accion_enviar_lista: pregunta.accion === 'enviar_lista',
+    resultado_si: pregunta.resultado_si ?? null,
+    resultado_no: pregunta.resultado_no ?? null,
+  }
+  return {
+    texto: '', tipo: 'boolean', orden_default: '', activa: true,
+    accion_enviar_lista: false, resultado_si: null, resultado_no: null,
+  }
+}
+
 export function PreguntaFormDialog({ open, onOpenChange, pregunta }: PreguntaFormDialogProps) {
-  const [opciones, setOpciones] = useState<string[]>([])
+  const [opciones, setOpciones] = useState<string[]>(() => pregunta?.opciones ?? [])
   const [newOpcion, setNewOpcion] = useState('')
   const [loading, setLoading] = useState(false)
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: {
-      texto: '',
-      tipo: 'boolean',
-      orden_default: '',
-      activa: true,
-      accion_enviar_lista: false,
-      resultado_si: null,
-      resultado_no: null,
-    },
+    defaultValues: buildDefaults(pregunta),
   })
 
   const tipoWatched = form.watch('tipo')
   const accionWatched = form.watch('accion_enviar_lista')
-
-  useEffect(() => {
-    if (open) {
-      if (pregunta) {
-        form.reset({
-          texto: pregunta.texto,
-          tipo: pregunta.tipo as PreguntaTipo,
-          orden_default: pregunta.orden_default?.toString() ?? '',
-          activa: pregunta.activa,
-          accion_enviar_lista: pregunta.accion === 'enviar_lista',
-          resultado_si: pregunta.resultado_si ?? null,
-          resultado_no: pregunta.resultado_no ?? null,
-        })
-        setOpciones(pregunta.opciones ?? [])
-      } else {
-        form.reset({
-          texto: '',
-          tipo: 'boolean',
-          orden_default: '',
-          activa: true,
-          accion_enviar_lista: false,
-          resultado_si: null,
-          resultado_no: null,
-        })
-        setOpciones([])
-      }
-      setNewOpcion('')
-    }
-  }, [open, pregunta, form])
 
   async function onSubmit(values: FormValues) {
     setLoading(true)

@@ -137,8 +137,8 @@ export function PersonasListaClient({ personas }: PersonasListaClientProps) {
         </Table>
       </div>
 
-      <PersonaEditForm open={formOpen} onOpenChange={setFormOpen} persona={editingPersona} />
-      <PersonaDetailDialog open={detailOpen} onOpenChange={setDetailOpen} persona={viewingPersona} />
+      <PersonaEditForm key={formOpen ? (editingPersona?.id ?? 'new') : 'closed'} open={formOpen} onOpenChange={setFormOpen} persona={editingPersona} />
+      <PersonaDetailDialog key={viewingPersona?.id} open={detailOpen} onOpenChange={setDetailOpen} persona={viewingPersona} />
     </div>
   )
 }

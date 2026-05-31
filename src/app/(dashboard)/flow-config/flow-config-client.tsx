@@ -168,6 +168,7 @@ export function FlowConfigClient({ preguntas }: FlowConfigClientProps) {
       </div>
 
       <PreguntaFormDialog
+        key={formOpen ? (editingPregunta?.id ?? 'new') : 'closed'}
         open={formOpen}
         onOpenChange={setFormOpen}
         pregunta={editingPregunta}
