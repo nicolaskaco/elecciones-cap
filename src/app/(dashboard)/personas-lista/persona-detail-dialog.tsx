@@ -12,6 +12,14 @@ import { getEventosParaPersona } from '@/lib/actions/eventos'
 import { ROL_LABELS } from '@/lib/constants/lista'
 import type { PersonaConRoles, RolListaTipo, Evento } from '@/types/database'
 
+const ROL_BADGE_VARIANT: Record<RolListaTipo, 'default' | 'secondary' | 'outline'> = {
+  Dirigente: 'default',
+  Comision_Electoral: 'secondary',
+  Comision_Fiscal: 'secondary',
+  Asamblea_Representativa: 'outline',
+  Colaborador: 'outline',
+}
+
 interface PersonaDetailDialogProps {
   open: boolean
   onOpenChange: (v: boolean) => void
@@ -77,7 +85,7 @@ export function PersonaDetailDialog({ open, onOpenChange, persona }: PersonaDeta
               <p className="text-xs text-muted-foreground mb-1">Roles</p>
               <div className="flex flex-wrap gap-1">
                 {persona.roles_lista.map(r => (
-                  <Badge key={r.id} variant="outline" className="text-xs">
+                  <Badge key={r.id} variant={ROL_BADGE_VARIANT[r.tipo as RolListaTipo]} className="text-xs">
                     {ROL_LABELS[r.tipo as RolListaTipo]}
                   </Badge>
                 ))}
