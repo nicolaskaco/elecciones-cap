@@ -3,7 +3,6 @@
 import { useState, useRef } from 'react'
 import { toast } from 'sonner'
 import { Upload, ArrowLeft, Check, AlertCircle } from 'lucide-react'
-import * as XLSX from 'xlsx'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -74,7 +73,8 @@ export function ExcelImport() {
     if (!file) return
 
     const reader = new FileReader()
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
+      const XLSX = await import('xlsx')
       const data = new Uint8Array(evt.target?.result as ArrayBuffer)
       const workbook = XLSX.read(data, { type: 'array', cellDates: true })
       const sheet = workbook.Sheets[workbook.SheetNames[0]]

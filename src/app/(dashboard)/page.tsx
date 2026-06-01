@@ -30,28 +30,31 @@ async function getKPIs() {
 async function getVoluntariosStats() {
   const supabase = await createClient()
 
-  const { data: voluntarios } = await supabase
-    .from('perfiles')
-    .select('id, nombre')
-    .eq('rol', 'Voluntario')
-    .order('nombre')
+  const [{ data: voluntarios }, { data: electoresRaw }, { data: llamadasRaw }] = await Promise.all([
+    supabase.from('perfiles').select('id, nombre').eq('rol', 'Voluntario').order('nombre'),
+    supabase.from('electores').select('asignado_a, estado').not('asignado_a', 'is', null),
+    supabase.from('llamadas').select('voluntario_id'),
+  ])
 
   if (!voluntarios?.length) return []
 
-  return Promise.all(
-    voluntarios.map(async (v) => {
-      const [asignadosRes, llamadasRes, confirmadosRes] = await Promise.all([
-        supabase.from('electores').select('id', { count: 'exact', head: true }).eq('asignado_a', v.id),
-        supabase.from('llamadas').select('id', { count: 'exact', head: true }).eq('voluntario_id', v.id),
-        supabase.from('electores').select('id', { count: 'exact', head: true }).eq('asignado_a', v.id).eq('estado', 'Confirmado'),
-      ])
-      const asignados = asignadosRes.count ?? 0
-      const llamadas = llamadasRes.count ?? 0
-      const confirmados = confirmadosRes.count ?? 0
-      const tasa = asignados > 0 ? Math.round((confirmados / asignados) * 100) : 0
-      return { id: v.id, nombre: v.nombre, asignados, llamadas, confirmados, tasa }
-    })
-  )
+  const electoresMap = new Map<string, { asignados: number; confirmados: number }>()
+  for (const e of electoresRaw ?? []) {
+    const cur = electoresMap.get(e.asignado_a!) ?? { asignados: 0, confirmados: 0 }
+    cur.asignados++
+    if (e.estado === 'Confirmado') cur.confirmados++
+    electoresMap.set(e.asignado_a!, cur)
+  }
+  const llamadasMap = new Map<string, number>()
+  for (const l of llamadasRaw ?? []) {
+    llamadasMap.set(l.voluntario_id, (llamadasMap.get(l.voluntario_id) ?? 0) + 1)
+  }
+  return voluntarios.map((v) => {
+    const e = electoresMap.get(v.id) ?? { asignados: 0, confirmados: 0 }
+    const llamadas = llamadasMap.get(v.id) ?? 0
+    const tasa = e.asignados > 0 ? Math.round((e.confirmados / e.asignados) * 100) : 0
+    return { id: v.id, nombre: v.nombre, ...e, llamadas, tasa }
+  })
 }
 
 const ESTADO_ORDER = [
@@ -76,16 +79,11 @@ const ESTADO_COLORS: Record<string, string> = {
 
 async function getEstadoBreakdown() {
   const supabase = await createClient()
-  const results = await Promise.all(
-    ESTADO_ORDER.map(async (estado) => {
-      const { count } = await supabase
-        .from('electores')
-        .select('id', { count: 'exact', head: true })
-        .eq('estado', estado)
-      return [estado, count ?? 0] as const
-    })
-  )
-  const counts = Object.fromEntries(results) as Record<string, number>
+  const { data } = await supabase.from('electores').select('estado')
+  const counts: Record<string, number> = {}
+  for (const row of data ?? []) {
+    counts[row.estado] = (counts[row.estado] ?? 0) + 1
+  }
   const total = Object.values(counts).reduce((a, b) => a + b, 0)
   return { total, counts }
 }
