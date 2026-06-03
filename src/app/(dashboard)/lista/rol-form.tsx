@@ -279,14 +279,12 @@ export function RolFormDialog({ open, onOpenChange, rol, personas, existingRoles
                   )} />
                 )}
 
-                {tipoWatched === 'Asamblea_Representativa' && (
-                  <FormField control={form.control} name="quien_lo_trajo" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Quién lo trajo</FormLabel>
-                      <FormControl><Input {...field} placeholder="Nombre del referente" /></FormControl>
-                    </FormItem>
-                  )} />
-                )}
+                <FormField control={form.control} name="quien_lo_trajo" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Quién lo trajo</FormLabel>
+                    <FormControl><Input {...field} placeholder="Nombre del referente" /></FormControl>
+                  </FormItem>
+                )} />
 
                 <FormField control={form.control} name="comentario" render={({ field }) => (
                   <FormItem>

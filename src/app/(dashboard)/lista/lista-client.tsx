@@ -28,8 +28,8 @@ const EXPORT_FIELDS: ExportField<RolListaConPersona>[] = [
   { key: 'email',           label: 'Email',        defaultChecked: false, getValue: r => r.personas.email },
   { key: 'tipo',            label: 'Rol',          defaultChecked: false, getValue: r => ROL_LABELS[r.tipo] },
   { key: 'posicion',        label: 'Posición',     defaultChecked: false, getValue: r => r.posicion },
-  { key: 'quien_lo_trajo',  label: 'Quién lo trajo', defaultChecked: false, getValue: r => r.quien_lo_trajo },
-  { key: 'comentario',      label: 'Comentario',   defaultChecked: false, getValue: r => r.comentario },
+  { key: 'quien_lo_trajo',  label: 'Quién lo trajo', defaultChecked: false, getValue: r => r.quien_lo_trajo ?? r.personas.quien_lo_trajo },
+  { key: 'comentario',      label: 'Comentario',   defaultChecked: false, getValue: r => r.comentario ?? r.personas.comentario },
 ]
 
 const ROL_TIPOS = Object.keys(ROL_LABELS) as RolListaTipo[]
@@ -178,8 +178,8 @@ export function ListaClient({ roles, personas }: ListaClientProps) {
                     <Badge variant={ROL_BADGE_VARIANT[r.tipo]}>{ROL_LABELS[r.tipo]}</Badge>
                   </TableCell>
                   <TableCell className="text-muted-foreground">{r.posicion ?? '—'}</TableCell>
-                  <TableCell className="text-muted-foreground">{r.quien_lo_trajo ?? '—'}</TableCell>
-                  <TableCell className="text-muted-foreground max-w-xs truncate">{r.comentario ?? '—'}</TableCell>
+                  <TableCell className="text-muted-foreground">{r.quien_lo_trajo ?? r.personas.quien_lo_trajo ?? '—'}</TableCell>
+                  <TableCell className="text-muted-foreground max-w-xs truncate">{r.comentario ?? r.personas.comentario ?? '—'}</TableCell>
                   <TableCell>
                     <div className="flex justify-end gap-1">
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(r)}>
