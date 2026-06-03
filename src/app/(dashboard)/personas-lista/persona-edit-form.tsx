@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -50,7 +49,6 @@ interface PersonaEditFormProps {
 }
 
 export function PersonaEditForm({ open, onOpenChange, persona }: PersonaEditFormProps) {
-  const router = useRouter()
   const [loading, setLoading] = useState(false)
   const isEdit = persona !== null
 
@@ -93,7 +91,6 @@ export function PersonaEditForm({ open, onOpenChange, persona }: PersonaEditForm
         toast.success('Persona creada')
       }
       onOpenChange(false)
-      router.refresh()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al guardar')
     } finally {
