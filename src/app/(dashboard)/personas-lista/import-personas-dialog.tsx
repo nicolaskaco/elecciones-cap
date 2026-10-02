@@ -30,6 +30,8 @@ const COL_MAP: Record<string, keyof ImportPersonasRow> = {
   'fecha_nacimiento': 'fecha_nacimiento',
   'dirección': 'direccion',
   'direccion': 'direccion',
+  'rol': 'rol',
+  'tipo': 'rol',
 }
 
 function parseSheet(data: unknown[][]): ImportPersonasRow[] {
@@ -76,6 +78,7 @@ export function ImportPersonasDialog() {
       try {
         const result = await importPersonas(preview)
         const msgs = [`${result.inserted} insertadas`, `${result.updated} actualizadas`]
+        if (result.rolesAssigned) msgs.push(`${result.rolesAssigned} roles asignados`)
         if (result.errors.length > 0) {
           toast.warning(`${msgs.join(', ')}. ${result.errors.length} errores: ${result.errors.slice(0, 3).join('; ')}`)
         } else {
@@ -114,8 +117,11 @@ export function ImportPersonasDialog() {
                 </p>
                 <div className="rounded-md border bg-muted/40 p-3 text-xs font-mono space-y-0.5">
                   <p><span className="font-semibold">Nombre</span> <span className="text-muted-foreground">(requerido)</span></p>
-                  <p>Cédula · Nro de Socio · Celular · Teléfono · Email · Fecha de Nacimiento · Dirección</p>
+                  <p>Cédula · Nro de Socio · Celular · Teléfono · Email · Fecha de Nacimiento · Dirección · Rol</p>
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Rol (opcional): Dirigente, Comisión Electoral, Comisión Fiscal, Asamblea Representativa o Colaborador.
+                </p>
                 <p className="text-xs text-muted-foreground">
                   Si la cédula coincide con una persona existente, sus datos serán actualizados. Si no, se creará una nueva persona.
                 </p>
@@ -139,6 +145,7 @@ export function ImportPersonasDialog() {
                         <TableHead>Nro Socio</TableHead>
                         <TableHead>Celular</TableHead>
                         <TableHead>Email</TableHead>
+                        <TableHead>Rol</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -149,6 +156,7 @@ export function ImportPersonasDialog() {
                           <TableCell>{r.nro_socio ?? '—'}</TableCell>
                           <TableCell>{r.celular ?? '—'}</TableCell>
                           <TableCell>{r.email ?? '—'}</TableCell>
+                          <TableCell>{r.rol ?? '—'}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

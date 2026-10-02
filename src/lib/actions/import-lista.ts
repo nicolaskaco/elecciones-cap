@@ -14,6 +14,7 @@ export interface ImportPersonasRow {
   email?: string | null
   fecha_nacimiento?: string | null
   direccion?: string | null
+  rol?: string | null
 }
 
 export interface ImportRolRow {
@@ -29,6 +30,7 @@ export interface ImportResult {
   inserted: number
   updated: number
   errors: string[]
+  rolesAssigned?: number
 }
 
 // Maps display label → DB enum value (accepts both accented and unaccented)
@@ -42,7 +44,14 @@ const TIPO_FROM_LABEL: Record<string, RolListaTipo> = {
   'Comision_Fiscal': 'Comision_Fiscal',
   'Asamblea Representativa': 'Asamblea_Representativa',
   'Asamblea_Representativa': 'Asamblea_Representativa',
+  'Colaborador': 'Colaborador',
 }
+
+const TIPO_FROM_LABEL_LOWER: Record<string, RolListaTipo> = Object.fromEntries(
+  Object.entries(TIPO_FROM_LABEL).map(([k, v]) => [k.toLowerCase(), v])
+)
+
+const ROLES_VALIDOS = 'Dirigente, Comisión Electoral, Comisión Fiscal, Asamblea Representativa, Colaborador'
 
 export async function importPersonas(rows: ImportPersonasRow[]): Promise<ImportResult> {
   await requireAdmin()
@@ -50,6 +59,7 @@ export async function importPersonas(rows: ImportPersonasRow[]): Promise<ImportR
 
   let inserted = 0
   let updated = 0
+  let rolesAssigned = 0
   const errors: string[] = []
 
   for (let i = 0; i < rows.length; i++) {
@@ -59,6 +69,15 @@ export async function importPersonas(rows: ImportPersonasRow[]): Promise<ImportR
     if (!row.nombre?.trim()) {
       errors.push(`${label}: campo Nombre requerido`)
       continue
+    }
+
+    let tipo: RolListaTipo | null = null
+    if (row.rol?.trim()) {
+      tipo = TIPO_FROM_LABEL_LOWER[row.rol.trim().toLowerCase()] ?? null
+      if (!tipo) {
+        errors.push(`${label}: Rol inválido "${row.rol}". Use: ${ROLES_VALIDOS}`)
+        continue
+      }
     }
 
     // Find existing persona by cédula
@@ -83,20 +102,47 @@ export async function importPersonas(rows: ImportPersonasRow[]): Promise<ImportR
       direccion: row.direccion?.trim() || null,
     }
 
+    let personaId: number
     if (existingId) {
-      const { error } = await supabase.from('personas').update(payload).eq('id', existingId)
-      if (error) errors.push(`${label} (${row.nombre}): ${error.message}`)
-      else updated++
+      // Only overwrite fields present in the file, so missing columns don't wipe existing data
+      const updatePayload = Object.fromEntries(
+        Object.entries(payload).filter(([, v]) => v !== null)
+      )
+      const { error } = await supabase.from('personas').update(updatePayload).eq('id', existingId)
+      if (error) {
+        errors.push(`${label} (${row.nombre}): ${error.message}`)
+        continue
+      }
+      updated++
+      personaId = existingId
     } else {
-      const { error } = await supabase.from('personas').insert(payload)
-      if (error) errors.push(`${label} (${row.nombre}): ${error.message}`)
-      else inserted++
+      const { data, error } = await supabase.from('personas').insert(payload).select('id').single()
+      if (error || !data) {
+        errors.push(`${label} (${row.nombre}): ${error?.message ?? 'Error al crear persona'}`)
+        continue
+      }
+      inserted++
+      personaId = data.id
+    }
+
+    if (tipo) {
+      const { data: existingRol } = await supabase
+        .from('roles_lista')
+        .select('id')
+        .eq('persona_id', personaId)
+        .eq('tipo', tipo)
+        .maybeSingle()
+      if (!existingRol) {
+        const { error } = await supabase.from('roles_lista').insert({ persona_id: personaId, tipo })
+        if (error) errors.push(`${label} (${row.nombre}): rol no asignado — ${error.message}`)
+        else rolesAssigned++
+      }
     }
   }
 
   revalidatePath('/personas-lista')
   revalidatePath('/lista')
-  return { inserted, updated, errors }
+  return { inserted, updated, errors, rolesAssigned }
 }
 
 export async function importRolesLista(rows: ImportRolRow[]): Promise<ImportResult> {
@@ -114,7 +160,7 @@ export async function importRolesLista(rows: ImportRolRow[]): Promise<ImportResu
     // Validate tipo
     const tipo = TIPO_FROM_LABEL[row.tipo?.trim() ?? '']
     if (!tipo) {
-      errors.push(`${label}: Rol inválido "${row.tipo}". Use: Dirigente, Comisión Electoral, Comisión Fiscal, Asamblea Representativa`)
+      errors.push(`${label}: Rol inválido "${row.tipo}". Use: ${ROLES_VALIDOS}`)
       continue
     }
 
