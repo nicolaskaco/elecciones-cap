@@ -14,6 +14,8 @@ export interface ImportPersonasRow {
   email?: string | null
   fecha_nacimiento?: string | null
   direccion?: string | null
+  quien_lo_trajo?: string | null
+  comentario?: string | null
   rol?: string | null
 }
 
@@ -89,6 +91,19 @@ export async function importPersonas(rows: ImportPersonasRow[]): Promise<ImportR
         .eq('cedula', row.cedula.trim())
         .maybeSingle()
       if (data) existingId = data.id
+    } else {
+      // No cédula in the file: match by name only if it's unambiguous
+      const escaped = row.nombre.trim().replace(/[\\%_]/g, '\\$&')
+      const { data } = await supabase
+        .from('personas')
+        .select('id')
+        .ilike('nombre', escaped)
+        .limit(2)
+      if (data && data.length > 1) {
+        errors.push(`${label}: nombre "${row.nombre}" coincide con varias personas, agregue cédula`)
+        continue
+      }
+      if (data?.length === 1) existingId = data[0].id
     }
 
     const payload = {
@@ -100,6 +115,8 @@ export async function importPersonas(rows: ImportPersonasRow[]): Promise<ImportR
       email: row.email?.trim() || null,
       fecha_nacimiento: row.fecha_nacimiento?.trim() || null,
       direccion: row.direccion?.trim() || null,
+      quien_lo_trajo: row.quien_lo_trajo?.trim() || null,
+      comentario: row.comentario?.trim() || null,
     }
 
     let personaId: number
