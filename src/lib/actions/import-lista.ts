@@ -6,6 +6,8 @@ import { revalidatePath } from 'next/cache'
 import type { RolListaTipo } from '@/types/database'
 
 export interface ImportPersonasRow {
+  /** Row number in the source sheet, used in error messages */
+  fila?: number
   nombre: string
   cedula?: string | null
   nro_socio?: string | null
@@ -14,6 +16,8 @@ export interface ImportPersonasRow {
   email?: string | null
   fecha_nacimiento?: string | null
   direccion?: string | null
+  quien_lo_trajo?: string | null
+  comentario?: string | null
   rol?: string | null
 }
 
@@ -53,6 +57,100 @@ const TIPO_FROM_LABEL_LOWER: Record<string, RolListaTipo> = Object.fromEntries(
 
 const ROLES_VALIDOS = 'Dirigente, Comisión Electoral, Comisión Fiscal, Asamblea Representativa, Colaborador'
 
+type SupabaseServer = Awaited<ReturnType<typeof createClient>>
+
+type PersonaMatch =
+  | { tipo: 'nueva' }
+  | { tipo: 'existente'; id: number; nombre: string }
+  | { tipo: 'ambigua' }
+  | { tipo: 'conflicto'; mensaje: string }
+
+function describePersona(p: { nombre: string; cedula: string | null }) {
+  return p.cedula ? `${p.nombre} (cédula ${p.cedula})` : p.nombre
+}
+
+// Matches by cédula, then by nro de socio (unique), then — only if the row has no cédula — by
+// name when exactly one persona has it. Reports rows whose cédula and nro de socio point to
+// different personas instead of letting the update hit the nro_socio unique constraint.
+async function findExistingPersona(
+  supabase: SupabaseServer,
+  row: ImportPersonasRow,
+): Promise<PersonaMatch> {
+  const cedula = row.cedula?.trim() || null
+  const nroSocio = row.nro_socio?.trim() || null
+
+  const [byCedula, bySocio] = await Promise.all([
+    cedula
+      ? supabase.from('personas').select('id, nombre, cedula, nro_socio').eq('cedula', cedula).maybeSingle()
+      : Promise.resolve({ data: null }),
+    nroSocio
+      ? supabase.from('personas').select('id, nombre, cedula, nro_socio').eq('nro_socio', nroSocio).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ])
+  const cedulaMatch = byCedula.data
+  const socioMatch = bySocio.data
+
+  if (cedulaMatch && socioMatch && cedulaMatch.id !== socioMatch.id) {
+    return {
+      tipo: 'conflicto',
+      mensaje: `La cédula coincide con ${describePersona(cedulaMatch)} pero el Nro de Socio ${nroSocio} pertenece a ${describePersona(socioMatch)}`,
+    }
+  }
+  if (cedulaMatch) return { tipo: 'existente', id: cedulaMatch.id, nombre: cedulaMatch.nombre }
+  if (socioMatch) {
+    if (cedula && socioMatch.cedula && socioMatch.cedula !== cedula) {
+      return {
+        tipo: 'conflicto',
+        mensaje: `El Nro de Socio ${nroSocio} pertenece a ${describePersona(socioMatch)}, con otra cédula`,
+      }
+    }
+    return { tipo: 'existente', id: socioMatch.id, nombre: socioMatch.nombre }
+  }
+  if (cedula) return { tipo: 'nueva' }
+
+  const escaped = row.nombre.trim().replace(/[\\%_]/g, '\\$&')
+  const { data } = await supabase
+    .from('personas')
+    .select('id, nombre')
+    .ilike('nombre', escaped)
+    .limit(2)
+  if (data && data.length > 1) return { tipo: 'ambigua' }
+  if (data?.length === 1) return { tipo: 'existente', id: data[0].id, nombre: data[0].nombre }
+  return { tipo: 'nueva' }
+}
+
+function parseTipo(rol: string | null | undefined): RolListaTipo | null | 'invalido' {
+  if (!rol?.trim()) return null
+  return TIPO_FROM_LABEL_LOWER[rol.trim().toLowerCase()] ?? 'invalido'
+}
+
+export interface ImportPersonaPreview {
+  estado: 'nueva' | 'existente' | 'ambigua' | 'error'
+  personaNombre?: string
+  mensaje?: string
+}
+
+export async function previewImportPersonas(rows: ImportPersonasRow[]): Promise<ImportPersonaPreview[]> {
+  await requireAdmin()
+  const supabase = await createClient()
+
+  const results: ImportPersonaPreview[] = []
+  const CHUNK = 20
+  for (let start = 0; start < rows.length; start += CHUNK) {
+    const chunk = await Promise.all(rows.slice(start, start + CHUNK).map(async (row): Promise<ImportPersonaPreview> => {
+      if (!row.nombre?.trim()) return { estado: 'error', mensaje: 'Nombre requerido' }
+      if (parseTipo(row.rol) === 'invalido') return { estado: 'error', mensaje: `Rol inválido "${row.rol}"` }
+      const match = await findExistingPersona(supabase, row)
+      if (match.tipo === 'ambigua') return { estado: 'ambigua', mensaje: 'Varias personas con ese nombre, agregue cédula' }
+      if (match.tipo === 'conflicto') return { estado: 'error', mensaje: match.mensaje }
+      if (match.tipo === 'existente') return { estado: 'existente', personaNombre: match.nombre }
+      return { estado: 'nueva' }
+    }))
+    results.push(...chunk)
+  }
+  return results
+}
+
 export async function importPersonas(rows: ImportPersonasRow[]): Promise<ImportResult> {
   await requireAdmin()
   const supabase = await createClient()
@@ -64,32 +162,29 @@ export async function importPersonas(rows: ImportPersonasRow[]): Promise<ImportR
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]
-    const label = `Fila ${i + 2}`
+    const label = `Fila ${row.fila ?? i + 2}`
 
     if (!row.nombre?.trim()) {
       errors.push(`${label}: campo Nombre requerido`)
       continue
     }
 
-    let tipo: RolListaTipo | null = null
-    if (row.rol?.trim()) {
-      tipo = TIPO_FROM_LABEL_LOWER[row.rol.trim().toLowerCase()] ?? null
-      if (!tipo) {
-        errors.push(`${label}: Rol inválido "${row.rol}". Use: ${ROLES_VALIDOS}`)
-        continue
-      }
+    const tipo = parseTipo(row.rol)
+    if (tipo === 'invalido') {
+      errors.push(`${label}: Rol inválido "${row.rol}". Use: ${ROLES_VALIDOS}`)
+      continue
     }
 
-    // Find existing persona by cédula
-    let existingId: number | null = null
-    if (row.cedula?.trim()) {
-      const { data } = await supabase
-        .from('personas')
-        .select('id')
-        .eq('cedula', row.cedula.trim())
-        .maybeSingle()
-      if (data) existingId = data.id
+    const match = await findExistingPersona(supabase, row)
+    if (match.tipo === 'ambigua') {
+      errors.push(`${label}: nombre "${row.nombre}" coincide con varias personas, agregue cédula`)
+      continue
     }
+    if (match.tipo === 'conflicto') {
+      errors.push(`${label} (${row.nombre}): ${match.mensaje}`)
+      continue
+    }
+    const existingId = match.tipo === 'existente' ? match.id : null
 
     const payload = {
       nombre: row.nombre.trim(),
@@ -100,6 +195,8 @@ export async function importPersonas(rows: ImportPersonasRow[]): Promise<ImportR
       email: row.email?.trim() || null,
       fecha_nacimiento: row.fecha_nacimiento?.trim() || null,
       direccion: row.direccion?.trim() || null,
+      quien_lo_trajo: row.quien_lo_trajo?.trim() || null,
+      comentario: row.comentario?.trim() || null,
     }
 
     let personaId: number
