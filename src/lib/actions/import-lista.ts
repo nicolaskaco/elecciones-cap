@@ -6,6 +6,8 @@ import { revalidatePath } from 'next/cache'
 import type { RolListaTipo } from '@/types/database'
 
 export interface ImportPersonasRow {
+  /** Row number in the source sheet, used in error messages */
+  fila?: number
   nombre: string
   cedula?: string | null
   nro_socio?: string | null
@@ -57,27 +59,64 @@ const ROLES_VALIDOS = 'Dirigente, Comisión Electoral, Comisión Fiscal, Asamble
 
 type SupabaseServer = Awaited<ReturnType<typeof createClient>>
 
-// Matches by cédula; if the row has no cédula, by name only when exactly one persona has it
+type PersonaMatch =
+  | { tipo: 'nueva' }
+  | { tipo: 'existente'; id: number; nombre: string }
+  | { tipo: 'ambigua' }
+  | { tipo: 'conflicto'; mensaje: string }
+
+function describePersona(p: { nombre: string; cedula: string | null }) {
+  return p.cedula ? `${p.nombre} (cédula ${p.cedula})` : p.nombre
+}
+
+// Matches by cédula, then by nro de socio (unique), then — only if the row has no cédula — by
+// name when exactly one persona has it. Reports rows whose cédula and nro de socio point to
+// different personas instead of letting the update hit the nro_socio unique constraint.
 async function findExistingPersona(
   supabase: SupabaseServer,
   row: ImportPersonasRow,
-): Promise<{ id: number; nombre: string } | 'ambigua' | null> {
-  if (row.cedula?.trim()) {
-    const { data } = await supabase
-      .from('personas')
-      .select('id, nombre')
-      .eq('cedula', row.cedula.trim())
-      .maybeSingle()
-    return data ?? null
+): Promise<PersonaMatch> {
+  const cedula = row.cedula?.trim() || null
+  const nroSocio = row.nro_socio?.trim() || null
+
+  const [byCedula, bySocio] = await Promise.all([
+    cedula
+      ? supabase.from('personas').select('id, nombre, cedula, nro_socio').eq('cedula', cedula).maybeSingle()
+      : Promise.resolve({ data: null }),
+    nroSocio
+      ? supabase.from('personas').select('id, nombre, cedula, nro_socio').eq('nro_socio', nroSocio).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ])
+  const cedulaMatch = byCedula.data
+  const socioMatch = bySocio.data
+
+  if (cedulaMatch && socioMatch && cedulaMatch.id !== socioMatch.id) {
+    return {
+      tipo: 'conflicto',
+      mensaje: `La cédula coincide con ${describePersona(cedulaMatch)} pero el Nro de Socio ${nroSocio} pertenece a ${describePersona(socioMatch)}`,
+    }
   }
+  if (cedulaMatch) return { tipo: 'existente', id: cedulaMatch.id, nombre: cedulaMatch.nombre }
+  if (socioMatch) {
+    if (cedula && socioMatch.cedula && socioMatch.cedula !== cedula) {
+      return {
+        tipo: 'conflicto',
+        mensaje: `El Nro de Socio ${nroSocio} pertenece a ${describePersona(socioMatch)}, con otra cédula`,
+      }
+    }
+    return { tipo: 'existente', id: socioMatch.id, nombre: socioMatch.nombre }
+  }
+  if (cedula) return { tipo: 'nueva' }
+
   const escaped = row.nombre.trim().replace(/[\\%_]/g, '\\$&')
   const { data } = await supabase
     .from('personas')
     .select('id, nombre')
     .ilike('nombre', escaped)
     .limit(2)
-  if (data && data.length > 1) return 'ambigua'
-  return data?.[0] ?? null
+  if (data && data.length > 1) return { tipo: 'ambigua' }
+  if (data?.length === 1) return { tipo: 'existente', id: data[0].id, nombre: data[0].nombre }
+  return { tipo: 'nueva' }
 }
 
 function parseTipo(rol: string | null | undefined): RolListaTipo | null | 'invalido' {
@@ -102,8 +141,9 @@ export async function previewImportPersonas(rows: ImportPersonasRow[]): Promise<
       if (!row.nombre?.trim()) return { estado: 'error', mensaje: 'Nombre requerido' }
       if (parseTipo(row.rol) === 'invalido') return { estado: 'error', mensaje: `Rol inválido "${row.rol}"` }
       const match = await findExistingPersona(supabase, row)
-      if (match === 'ambigua') return { estado: 'ambigua', mensaje: 'Varias personas con ese nombre, agregue cédula' }
-      if (match) return { estado: 'existente', personaNombre: match.nombre }
+      if (match.tipo === 'ambigua') return { estado: 'ambigua', mensaje: 'Varias personas con ese nombre, agregue cédula' }
+      if (match.tipo === 'conflicto') return { estado: 'error', mensaje: match.mensaje }
+      if (match.tipo === 'existente') return { estado: 'existente', personaNombre: match.nombre }
       return { estado: 'nueva' }
     }))
     results.push(...chunk)
@@ -122,7 +162,7 @@ export async function importPersonas(rows: ImportPersonasRow[]): Promise<ImportR
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]
-    const label = `Fila ${i + 2}`
+    const label = `Fila ${row.fila ?? i + 2}`
 
     if (!row.nombre?.trim()) {
       errors.push(`${label}: campo Nombre requerido`)
@@ -136,11 +176,15 @@ export async function importPersonas(rows: ImportPersonasRow[]): Promise<ImportR
     }
 
     const match = await findExistingPersona(supabase, row)
-    if (match === 'ambigua') {
+    if (match.tipo === 'ambigua') {
       errors.push(`${label}: nombre "${row.nombre}" coincide con varias personas, agregue cédula`)
       continue
     }
-    const existingId = match?.id ?? null
+    if (match.tipo === 'conflicto') {
+      errors.push(`${label} (${row.nombre}): ${match.mensaje}`)
+      continue
+    }
+    const existingId = match.tipo === 'existente' ? match.id : null
 
     const payload = {
       nombre: row.nombre.trim(),

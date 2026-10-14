@@ -20,7 +20,7 @@ import {
   type ImportPersonasRow, type ImportPersonaPreview,
 } from '@/lib/actions/import-lista'
 
-type Field = keyof ImportPersonasRow
+type Field = Exclude<keyof ImportPersonasRow, 'fila'>
 
 const FIELD_LABELS: Record<Field, string> = {
   nombre: 'Nombre',
@@ -88,8 +88,9 @@ function autoMapping(headers: string[]): (Field | null)[] {
 }
 
 function buildRows(sheet: SheetData, mapping: (Field | null)[]): ImportPersonasRow[] {
-  return sheet.rows.map(raw => {
-    const row: ImportPersonasRow = { nombre: '' }
+  return sheet.rows.map((raw, idx) => {
+    // +2: header row, and spreadsheets are 1-based
+    const row: ImportPersonasRow = { fila: idx + 2, nombre: '' }
     mapping.forEach((field, i) => {
       if (field) (row as unknown as Record<string, unknown>)[field] = String(raw[i] ?? '').trim() || null
     })
@@ -223,7 +224,7 @@ export function ImportPersonasDialog() {
                   Rol (opcional): Dirigente, Comisión Electoral, Comisión Fiscal, Asamblea Representativa o Colaborador.
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Si la cédula coincide con una persona existente (o el nombre, cuando la fila no tiene cédula), sus datos serán actualizados. Si no, se creará una nueva persona. Las celdas vacías no borran datos existentes.
+                  Si la cédula o el Nro de Socio coinciden con una persona existente (o el nombre, cuando la fila no tiene cédula), sus datos serán actualizados. Si no, se creará una nueva persona. Las celdas vacías no borran datos existentes.
                 </p>
                 <Button variant="outline" onClick={() => inputRef.current?.click()}>
                   <Upload className="h-4 w-4 mr-2" />
@@ -284,6 +285,7 @@ export function ImportPersonasDialog() {
                       <Table>
                         <TableHeader>
                           <TableRow>
+                            <TableHead className="w-12">Fila</TableHead>
                             <TableHead>Estado</TableHead>
                             {previewFields.map(f => <TableHead key={f}>{FIELD_LABELS[f]}</TableHead>)}
                           </TableRow>
@@ -296,6 +298,7 @@ export function ImportPersonasDialog() {
                               ?? (status?.personaNombre && status.personaNombre !== r.nombre ? `Coincide con ${status.personaNombre}` : undefined)
                             return (
                               <TableRow key={i}>
+                                <TableCell className="text-muted-foreground">{r.fila}</TableCell>
                                 <TableCell>
                                   {badge
                                     ? <Badge variant={badge.variant} className="text-xs" title={detail}>{badge.label}</Badge>
