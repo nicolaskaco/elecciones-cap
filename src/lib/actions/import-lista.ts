@@ -55,6 +55,62 @@ const TIPO_FROM_LABEL_LOWER: Record<string, RolListaTipo> = Object.fromEntries(
 
 const ROLES_VALIDOS = 'Dirigente, Comisión Electoral, Comisión Fiscal, Asamblea Representativa, Colaborador'
 
+type SupabaseServer = Awaited<ReturnType<typeof createClient>>
+
+// Matches by cédula; if the row has no cédula, by name only when exactly one persona has it
+async function findExistingPersona(
+  supabase: SupabaseServer,
+  row: ImportPersonasRow,
+): Promise<{ id: number; nombre: string } | 'ambigua' | null> {
+  if (row.cedula?.trim()) {
+    const { data } = await supabase
+      .from('personas')
+      .select('id, nombre')
+      .eq('cedula', row.cedula.trim())
+      .maybeSingle()
+    return data ?? null
+  }
+  const escaped = row.nombre.trim().replace(/[\\%_]/g, '\\$&')
+  const { data } = await supabase
+    .from('personas')
+    .select('id, nombre')
+    .ilike('nombre', escaped)
+    .limit(2)
+  if (data && data.length > 1) return 'ambigua'
+  return data?.[0] ?? null
+}
+
+function parseTipo(rol: string | null | undefined): RolListaTipo | null | 'invalido' {
+  if (!rol?.trim()) return null
+  return TIPO_FROM_LABEL_LOWER[rol.trim().toLowerCase()] ?? 'invalido'
+}
+
+export interface ImportPersonaPreview {
+  estado: 'nueva' | 'existente' | 'ambigua' | 'error'
+  personaNombre?: string
+  mensaje?: string
+}
+
+export async function previewImportPersonas(rows: ImportPersonasRow[]): Promise<ImportPersonaPreview[]> {
+  await requireAdmin()
+  const supabase = await createClient()
+
+  const results: ImportPersonaPreview[] = []
+  const CHUNK = 20
+  for (let start = 0; start < rows.length; start += CHUNK) {
+    const chunk = await Promise.all(rows.slice(start, start + CHUNK).map(async (row): Promise<ImportPersonaPreview> => {
+      if (!row.nombre?.trim()) return { estado: 'error', mensaje: 'Nombre requerido' }
+      if (parseTipo(row.rol) === 'invalido') return { estado: 'error', mensaje: `Rol inválido "${row.rol}"` }
+      const match = await findExistingPersona(supabase, row)
+      if (match === 'ambigua') return { estado: 'ambigua', mensaje: 'Varias personas con ese nombre, agregue cédula' }
+      if (match) return { estado: 'existente', personaNombre: match.nombre }
+      return { estado: 'nueva' }
+    }))
+    results.push(...chunk)
+  }
+  return results
+}
+
 export async function importPersonas(rows: ImportPersonasRow[]): Promise<ImportResult> {
   await requireAdmin()
   const supabase = await createClient()
@@ -73,38 +129,18 @@ export async function importPersonas(rows: ImportPersonasRow[]): Promise<ImportR
       continue
     }
 
-    let tipo: RolListaTipo | null = null
-    if (row.rol?.trim()) {
-      tipo = TIPO_FROM_LABEL_LOWER[row.rol.trim().toLowerCase()] ?? null
-      if (!tipo) {
-        errors.push(`${label}: Rol inválido "${row.rol}". Use: ${ROLES_VALIDOS}`)
-        continue
-      }
+    const tipo = parseTipo(row.rol)
+    if (tipo === 'invalido') {
+      errors.push(`${label}: Rol inválido "${row.rol}". Use: ${ROLES_VALIDOS}`)
+      continue
     }
 
-    // Find existing persona by cédula
-    let existingId: number | null = null
-    if (row.cedula?.trim()) {
-      const { data } = await supabase
-        .from('personas')
-        .select('id')
-        .eq('cedula', row.cedula.trim())
-        .maybeSingle()
-      if (data) existingId = data.id
-    } else {
-      // No cédula in the file: match by name only if it's unambiguous
-      const escaped = row.nombre.trim().replace(/[\\%_]/g, '\\$&')
-      const { data } = await supabase
-        .from('personas')
-        .select('id')
-        .ilike('nombre', escaped)
-        .limit(2)
-      if (data && data.length > 1) {
-        errors.push(`${label}: nombre "${row.nombre}" coincide con varias personas, agregue cédula`)
-        continue
-      }
-      if (data?.length === 1) existingId = data[0].id
+    const match = await findExistingPersona(supabase, row)
+    if (match === 'ambigua') {
+      errors.push(`${label}: nombre "${row.nombre}" coincide con varias personas, agregue cédula`)
+      continue
     }
+    const existingId = match?.id ?? null
 
     const payload = {
       nombre: row.nombre.trim(),
